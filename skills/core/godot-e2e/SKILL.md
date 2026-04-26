@@ -65,7 +65,7 @@ def test_player_moves_right(game):
 ```
 
 ```bash
-godot-e2e tests/e2e/ -v
+godot-e2e e2e/ -v
 ```
 
 ## API Quick Reference
@@ -157,8 +157,8 @@ from godot_e2e import Vector2, Vector2i, Vector3, Color, Rect2
 ## Running & Debugging
 
 ```bash
-godot-e2e tests/e2e/ -v                          # all tests
-godot-e2e tests/e2e/test_player.py -v             # single file
+godot-e2e e2e/ -v                          # all tests
+godot-e2e e2e/test_player.py -v             # single file
 godot-e2e --godot-path /path/to/godot tests/ -v   # specific binary
 ```
 
@@ -204,11 +204,11 @@ Verifiers MUST read the spec and confirm the worker's E2E tests cover ALL listed
 
 ## E2E Helper Convention
 
-Workers maintain reusable E2E helper functions in `tests/e2e/helpers/` to prevent test duplication and ensure fixture updates propagate.
+Workers maintain reusable E2E helper functions in `e2e/helpers/` to prevent test duplication and ensure fixture updates propagate.
 
 1. Each worker creates/updates a helper file for their system's E2E interface (e.g., `player_helper.py`)
 2. Helper functions wrap common multi-step operations (e.g., `start_game` = change scene + wait + verify)
-3. Each helper file MUST have a corresponding unittest: `tests/e2e/helpers/test_{name}_helper.py`
+3. Each helper file MUST have a corresponding unittest: `e2e/helpers/test_{name}_helper.py`
 4. Helper unittests verify the helper functions work (game launches, actions execute, no crash)
 5. When a worker modifies a system that changes E2E behavior (node paths, method signatures), they MUST update the corresponding helper
 
@@ -218,7 +218,7 @@ Workers maintain reusable E2E helper functions in `tests/e2e/helpers/` to preven
 2. **Entity naming change** → update helpers that reference old entity paths
 3. **New game state** (e.g., menu before gameplay) → create a `game_playing` fixture that navigates past menus to gameplay state
 4. **Private → public methods** → E2E `game.call()` cannot call `_private()` methods; any method called by E2E must be public
-5. **After ANY structural change** → run `godot-e2e tests/e2e/ -v` to catch broken fixtures immediately
+5. **After ANY structural change** → run `godot-e2e e2e/ -v` to catch broken fixtures immediately
 
 > **Note:** Orchestrator writes E2E specs to `.godotmaker/workers/{task_id}.md` before dispatching workers. Verifiers MUST confirm the worker's E2E tests cover ALL listed acceptance criteria.
 

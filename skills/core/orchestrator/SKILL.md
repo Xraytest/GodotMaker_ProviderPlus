@@ -1,15 +1,9 @@
 ---
 name: orchestrator
 description: |
-  Game Builder Agent. Coordinates ECS-based game creation from natural language.
-  Opus lead agent + Sonnet workers/verifiers architecture.
-  Mandatory pipeline with gates — no steps may be skipped.
-triggers:
-  - make a game
-  - build a game
-  - create a game
-  - generate a game
-  - game from description
+  DEPRECATED — use gm-setup, gm-build, gm-verify, gm-evaluate, gm-accept, gm-finalize instead.
+  This skill is retained as a support directory for stage definitions and dispatch templates
+  referenced by the new pipeline skills.
 ---
 
 # Game Builder Agent

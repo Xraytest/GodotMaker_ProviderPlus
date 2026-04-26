@@ -34,10 +34,9 @@ Agent({
 ### Deliverables                                         [REQUIRED]
 - [ ] {file path}: {what it should contain}
 - [ ] {unit test file path}: {test scenarios — minimum 2 unit tests}
-- [ ] `tests/e2e/test_{feature}.py`: e2e test using `game` fixture from conftest.py (NOT a placeholder — must have real test logic, minimum 50 chars of test code)
+- [ ] e2e-testable interface: public methods / signals / simulate_* helpers exposed on this system, with unit tests covering each one
 - [ ] Run headless-build and confirm compilation
 - [ ] Run unit tests and include pass/fail output
-- [ ] Run e2e test and include pass/fail output
 - [ ] Summary of what was implemented (<200 words)
 - [ ] MEMORY entry: discoveries, gotchas, decisions (<100 words)
 
@@ -51,37 +50,6 @@ Agent({
 ### Gotchas                                              [REQUIRED for ECS tasks]
 - MUST include: "Read .claude/skills/gecs/gotchas.md before writing any code"
 - Copy relevant gotchas from reviewer skills (ui/gotchas.md, animation/gotchas.md, etc.)
-
-### E2E Quick Reference                                  [REQUIRED]
-{Copy the block below verbatim into every worker brief:}
-
-```
-DO NOT import GodotGame — it does not exist.
-Use the `game` fixture from conftest.py (already created in the project).
-
-# conftest.py provides: game fixture → GodotE2E instance
-# Your test file:
-def test_feature(game):
-    game.press_action("jump")           # tap (press+release)
-    game.input_action("move_right", True)  # hold
-    game.wait_physics_frames(10)
-    game.input_action("move_right", False) # release
-    val = game.get_property("/root/Main/Player", "position:x")
-    assert val > 0
-
-# Key methods:
-#   game.press_action(action)              — tap action
-#   game.input_action(action, pressed)     — hold/release (2 args required)
-#   game.get_property(node_path, property) — read node property
-#   game.set_property(node_path, prop, val)— write node property
-#   game.call(node_path, method, args=[])  — call method on node
-#   game.wait_physics_frames(count)        — wait N physics frames
-#   game.wait_seconds(seconds)             — wait real time
-#   game.wait_for_node(path, timeout=5.0)  — wait until node exists
-#   game.node_exists(path) -> bool         — check node existence
-#   game.screenshot(save_path) -> str      — capture screenshot
-#   game.reload_scene()                    — reload current scene
-```
 
 ### Prohibited Actions                                   [REQUIRED]
 - DO NOT fabricate resource paths — only use paths listed in ASSETS.md or verified to exist in the project. If you need an asset that doesn't exist, report it in your summary; do NOT invent a path.
@@ -109,13 +77,12 @@ def test_feature(game):
 7. **Test file naming**: `test_{source_file_stem}.gd` — e.g., system file `s_movement.gd` → test file `test_s_movement.gd`. check_project.py enforces this pattern.
 8. **After creating files with `class_name`**: remind worker to run `godot --headless --import` to rebuild the cache.
 9. **gdUnit4 version compatibility**: Godot 4.4 → gdUnit4 v5.x, Godot 4.5+ → gdUnit4 v6.x. Headless mode requires `--ignoreHeadlessMode`.
-10. **E2E input handling**: do NOT use `Input.is_action_just_pressed()` in ECS systems. Use `_input()` callback + flag variable pattern, expose `simulate_*()` methods for e2e testing.
-11. **E2E API cheat sheet is mandatory**: Always copy the E2E Quick Reference block into every worker brief. Workers will hallucinate wrong APIs (GodotGame, get_node_property) without it.
-12. **UI scene root must be Control**: Any scene containing UI (menus, HUD, panels) must use a Control node as root, not Node2D. Control anchor/layout only works when the entire ancestor chain is Control nodes.
-13. **Entity.name must be set explicitly**: When creating Entity instances programmatically, set `entity.name = "MyEntity"` before `add_entity()`. Without this, Godot assigns unpredictable auto-names (`@Node@2`), breaking E2E test node paths.
-14. **Worker self-check is mandatory**: Workers must run the self-check protocol before submitting their report. If self-check is not mentioned in the report, reject it.
-15. **UI/scene tasks require SCENES.md reference.** When dispatching a worker for any UI screen, HUD, menu, or scene layout task, you MUST copy the relevant scene description from SCENES.md into the brief. Workers without layout specs will produce inconsistent UIs.
-16. **Worker model from config.** Read `worker_model` from `.godotmaker/config.yaml` (default: `opus`) and include it as `model:` in every Agent() call. See the Agent Call template at the top.
+10. **E2E input handling**: do NOT use `Input.is_action_just_pressed()` in ECS systems. Use `_input()` callback + flag variable pattern, expose `simulate_*()` methods so the Evaluator's e2e tests can drive the system.
+11. **UI scene root must be Control**: Any scene containing UI (menus, HUD, panels) must use a Control node as root, not Node2D. Control anchor/layout only works when the entire ancestor chain is Control nodes.
+12. **Entity.name must be set explicitly**: When creating Entity instances programmatically, set `entity.name = "MyEntity"` before `add_entity()`. Without this, Godot assigns unpredictable auto-names (`@Node@2`), breaking E2E test node paths.
+13. **Worker self-check is mandatory**: Workers must run the self-check protocol before submitting their report. If self-check is not mentioned in the report, reject it.
+14. **UI/scene tasks require SCENES.md reference.** When dispatching a worker for any UI screen, HUD, menu, or scene layout task, you MUST copy the relevant scene description from SCENES.md into the brief. Workers without layout specs will produce inconsistent UIs.
+15. **Worker model from config.** Read `worker_model` from `.godotmaker/config.yaml` (default: `opus`) and include it as `model:` in every Agent() call. See the Agent Call template at the top.
 
 ## Worker Utility Convention
 

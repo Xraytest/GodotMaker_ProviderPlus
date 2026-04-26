@@ -11,9 +11,9 @@ The scaffold MUST create:
 - godot-e2e addon installed (enable as plugin in Project Settings) — version from `.claude/config/addon_versions.json`
 - Base Component definitions from STRUCTURE.md
 - Empty System files with correct class signatures
-- E2E test directory with conftest.py: `tests/e2e/conftest.py` (see template below)
+- E2E test directory with conftest.py: `e2e/conftest.py` (see template below)
 
-**E2E conftest.py template** (create in `tests/e2e/conftest.py`):
+**E2E conftest.py template** (create in `e2e/conftest.py`):
 ```python
 import pytest
 import os
@@ -33,7 +33,7 @@ def game(_game_process):
     _game_process.wait_for_node("/root/Main", timeout=5.0)
     yield _game_process
 ```
-All E2E test files MUST go in `tests/e2e/` and use the `game` fixture from this conftest.py.
+All E2E test files MUST go in `e2e/` and use the `game` fixture from this conftest.py.
 
 **Addon installation:** Read `.claude/config/addon_versions.json`, detect Godot version, download exact tags specified. See `project-scaffold/references/addons.md` for details. Do NOT guess versions or use latest.
 
@@ -49,7 +49,7 @@ All E2E test files MUST go in `tests/e2e/` and use the `game` fixture from this 
 - [ ] Headless build passes: `godot --headless --quit 2>&1` — no ERROR lines
 - [ ] At least 1 Component file exists
 - [ ] At least 1 System file exists (empty stubs are acceptable at this stage)
-- [ ] `tests/e2e/conftest.py` exists with `GodotE2E` import
+- [ ] `e2e/conftest.py` exists with `GodotE2E` import
 
 > `--tests` (unit test coverage per system) is intentionally NOT run at Gate 3 — systems are empty stubs at scaffold stage. Test coverage is first checked at Gate 5.
 

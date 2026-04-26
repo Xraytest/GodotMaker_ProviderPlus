@@ -409,7 +409,7 @@ game.close()
     Expand-Archive godot.zip -DestinationPath C:\godot
 
 - name: Run E2E tests
-  run: godot-e2e tests/e2e/ -v --timeout=60
+  run: godot-e2e e2e/ -v --timeout=60
   env:
     GODOT_PATH: C:\godot\Godot_v4.4-stable_win64.exe
 ```
@@ -424,14 +424,14 @@ game.close()
     sudo mv Godot_v4.4-stable_linux.x86_64 /usr/local/bin/godot
 
 - name: Run E2E tests
-  run: xvfb-run --auto-servernum godot-e2e tests/e2e/ -v --timeout=60
+  run: xvfb-run --auto-servernum godot-e2e e2e/ -v --timeout=60
 ```
 
 ### macOS (GitHub Actions)
 
 ```yaml
 - name: Run E2E tests
-  run: godot-e2e tests/e2e/ -v --timeout=60
+  run: godot-e2e e2e/ -v --timeout=60
   env:
     GODOT_PATH: /Applications/Godot.app/Contents/MacOS/Godot
 ```

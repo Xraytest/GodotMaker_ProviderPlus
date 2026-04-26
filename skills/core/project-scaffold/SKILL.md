@@ -68,9 +68,8 @@ Create the project root and all subdirectories:
 │   └── game_world.tscn      # Gameplay scene with camera
 ├── test/
 │   └── test_example.gd      # gdUnit4 test template
-├── tests/
-│   └── e2e/
-│       └── conftest.py       # E2E test config (GODOT_PROJECT = "../..")
+├── e2e/
+│   └── conftest.py           # E2E test config (GODOT_PROJECT = "..")
 ├── assets/
 │   ├── sprites/
 │   ├── audio/
