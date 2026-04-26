@@ -1,0 +1,57 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {"type": "command", "command": "python .godotmaker/hooks/session_start.py"}
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {"type": "command", "command": "python .godotmaker/hooks/check_file_permissions.py"},
+          {"type": "command", "command": "python .godotmaker/hooks/stage_reminder.py"}
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {"type": "command", "command": "python .godotmaker/hooks/check_stage_prerequisites.py"}
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {"type": "command", "command": "python .godotmaker/hooks/check_asset_access.py"}
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {"type": "command", "command": "python .godotmaker/hooks/log_subagent.py"}
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {"type": "command", "command": "python .godotmaker/hooks/on_subagent_stop.py"}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {"type": "command", "command": "python .godotmaker/hooks/check_completion.py"}
+        ]
+      }
+    ]
+  }
+}

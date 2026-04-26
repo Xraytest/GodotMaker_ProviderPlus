@@ -1,0 +1,16 @@
+# GodotMaker project configuration
+# Edit these values to customize behavior
+# Deployed to .godotmaker/config.yaml by publish script
+
+# VQA model for visual quality checks (any Gemini model name)
+# Default: gemini-3-flash
+# Examples: gemini-3-flash, gemini-2.5-flash, gemini-2.0-flash
+vqa_model: gemini-3-flash
+
+# Agent model configuration
+# Workers use opus for complex implementation tasks
+# Verifiers, reviewers, and analysts use sonnet for lighter validation work
+worker_model: opus
+verifier_model: sonnet
+reviewer_model: sonnet
+analyst_model: sonnet

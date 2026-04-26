@@ -1,0 +1,87 @@
+site_name: GodotMaker
+site_url: https://RandallLiuXin.github.io/GodotMaker/
+site_description: ECS-native text-to-game framework for Godot
+site_author: RandallLiuXin
+repo_url: https://github.com/RandallLiuXin/GodotMaker
+repo_name: RandallLiuXin/GodotMaker
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: wiki/01-getting-started/installation.md
+      - First Game: wiki/01-getting-started/first-game.md
+      - Project Layout: wiki/01-getting-started/project-layout.md
+  - Concepts:
+      - Architecture Overview: wiki/02-concepts/architecture-overview.md
+      - Multi-Agent Model: wiki/02-concepts/multi-agent-model.md
+      - ECS Design: wiki/02-concepts/ecs-design.md
+      - Orchestrator Pipeline: wiki/02-concepts/orchestrator-pipeline.md
+  - Skills:
+      - Skill System: wiki/03-skills/skill-system.md
+      - Core Skills: wiki/03-skills/core-skills.md
+      - Reviewer Skills: wiki/03-skills/reviewer-skills.md
+      - Writing a Skill: wiki/03-skills/writing-a-skill.md
+  - Hooks:
+      - Hook System: wiki/04-hooks/hook-system.md
+      - Hook Reference: wiki/04-hooks/hook-reference.md
+      - Metrics & State: wiki/04-hooks/metrics-and-state.md
+  - Tools:
+      - Publish: wiki/05-tools/publish.md
+      - Check Project: wiki/05-tools/check-project.md
+      - Check Env: wiki/05-tools/check-env.md
+      - Asset Tools: wiki/05-tools/asset-tools.md
+  - Configuration:
+      - godotmaker.yaml: wiki/06-configuration/godotmaker-yaml.md
+      - Project Config: wiki/06-configuration/project-config.md
+      - Stage Schemas: wiki/06-configuration/stage-schemas.md
+      - Addon Versions: wiki/06-configuration/addon-versions.md
+  - Contributing:
+      - Development Setup: wiki/07-contributing/development-setup.md
+      - Codebase Guide: wiki/07-contributing/codebase-guide.md
+      - Testing: wiki/07-contributing/testing.md
+      - Release Process: wiki/07-contributing/release-process.md
+  - Reference:
+      - Glossary: wiki/08-reference/glossary.md
+      - FAQ: wiki/08-reference/faq.md
+      - Changelog: wiki/08-reference/changelog.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+plugins:
+  - search

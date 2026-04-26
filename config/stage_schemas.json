@@ -1,0 +1,26 @@
+{
+  "1": {
+    "files": ["GDD.md", "PLAN.md", "ASSETS.md", "SCENES.md", "TOC.md"]
+  },
+  "2": {
+    "files": ["STRUCTURE.md"]
+  },
+  "3": {
+    "files": ["project.godot", "addons/gecs/"]
+  },
+  "4": {
+    "checks": ["references_has_images"]
+  },
+  "5": {
+    "checks": ["metrics_has_worker_done", "plan_has_non_pending"]
+  },
+  "6": {
+    "checks": ["metrics_has_new_worker_done", "plan_no_pending"]
+  },
+  "7": {
+    "checks": ["metrics_has_verifier"]
+  },
+  "8": {
+    "checks": ["screenshots_match_scenes"]
+  }
+}

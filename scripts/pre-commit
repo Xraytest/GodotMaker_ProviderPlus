@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Pre-commit hook: run gitleaks to detect secrets before commit
+# Installed by scripts/install-hooks.sh
+
+set -euo pipefail
+
+# Check if gitleaks is installed
+if ! command -v gitleaks &> /dev/null; then
+    echo "[pre-commit] WARNING: gitleaks not found. Install it: https://github.com/gitleaks-io/gitleaks"
+    echo "[pre-commit] Skipping secret scan."
+    exit 0
+fi
+
+# Scan only staged changes (fast, only checks what you're about to commit)
+echo "[pre-commit] Running gitleaks on staged changes..."
+gitleaks protect --staged --config .gitleaks.toml --verbose
+
+echo "[pre-commit] No secrets detected."

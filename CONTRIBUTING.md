@@ -1,0 +1,100 @@
+# Contributing to GodotMaker
+
+Thank you for your interest in contributing to GodotMaker! This guide will help you get started.
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+
+## How to Contribute
+
+### Reporting Bugs
+
+1. Search [existing issues](https://github.com/RandallLiuXin/GodotMaker/issues) to avoid duplicates.
+2. Use the **Bug Report** issue template.
+3. Include: Godot version, OS, steps to reproduce, expected vs actual behavior.
+
+### Suggesting Features
+
+1. Open an issue using the **Feature Request** template.
+2. Describe the use case and why it benefits the project.
+
+### Submitting Pull Requests
+
+1. Fork the repo and create a branch from `main`.
+2. Follow the coding conventions below.
+3. Write or update tests for your changes.
+4. **Run benchmarks** — you must verify your changes do not regress performance before submitting. Include benchmark results in the PR description.
+5. Run the full validation pipeline locally:
+   ```bash
+   # Lint GDScript
+   gdlint .
+
+   # Run tests
+   pytest
+   godot --headless -s addons/gdunit4/bin/gdunit4_run.gd
+
+   # Gitleaks (runs automatically via pre-commit hook)
+   gitleaks detect --source .
+   ```
+6. Add a changelog entry to [`docs/update/next.md`](docs/update/next.md) describing your change.
+7. Open a PR against `main` using the [PR template](.github/PULL_REQUEST_TEMPLATE.md).
+
+## Development Setup
+
+### Prerequisites
+
+- Godot 4.x (with .NET support recommended)
+- Python 3.10+
+- .NET SDK 8.0+
+- [gitleaks](https://github.com/gitleaks-io/gitleaks) (for secret scanning)
+
+### Getting Started
+
+```bash
+git clone https://github.com/RandallLiuXin/GodotMaker.git
+cd GodotMaker
+
+# Install git hooks (gitleaks pre-commit)
+bash scripts/install-hooks.sh
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
+
+## Coding Conventions
+
+### GDScript / C#
+
+- Follow the [GDScript style guide](https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/gdscript_styleguide.html).
+- Code and comments in **English**.
+- ECS systems must declare `reads`, `writes`, `creates_node`, `requires_node` metadata.
+- Physics callbacks must never manipulate the node tree directly — use `DestroyTag` + `set_deferred`.
+
+### Python (tools/)
+
+- Follow PEP 8.
+- Type hints encouraged.
+- Tests in `tests/` using pytest.
+
+### Commit Messages
+
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
+- Keep the first line under 72 characters.
+- Reference related issues: `Fixes #123`.
+
+## Branch Strategy
+
+- `main` — stable, always passing CI.
+- Feature branches: `feat/short-description`.
+- Bug fix branches: `fix/short-description`.
+
+## Review Process
+
+1. All PRs require at least one review.
+2. CI must pass before merge.
+3. Benchmark verification is mandatory — reviewers will check for performance data in the PR description.
+
+## Questions?
+
+Open a [Discussion](https://github.com/RandallLiuXin/GodotMaker/discussions) or file an issue.
