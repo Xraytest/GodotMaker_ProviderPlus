@@ -52,8 +52,8 @@ The checker scans all `.gd` files outside `addons/`, `.godot/`, and `.claude/` d
 ### E2E Tests (`--e2e`)
 
 - godot-e2e plugin enabled in `project.godot`, or addon directory exists
-- `tests/e2e/conftest.py` exists
-- E2E test files found in `tests/e2e/` (matching `test_*.py`)
+- `e2e/conftest.py` exists
+- E2E test files found in `e2e/` (matching `test_*.py`)
 - Content quality: files must be >50 characters, contain `def test_` functions, and not consist entirely of placeholder content
 
 ### Planning Documents (`--plan`)

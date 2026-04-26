@@ -92,14 +92,14 @@ Progress is tracked in `.godotmaker/stage.json`, which records a UTC timestamp f
 - godot-e2e addon installed and enabled
 - Base component definition files
 - Empty system stub files with correct class signatures
-- `tests/e2e/conftest.py` with GodotE2E fixture
+- `e2e/conftest.py` with GodotE2E fixture
 - Git repository initialized (required for worktree isolation)
 
 **Gate 3 validation**:
 - Files exist: `project.godot`, `addons/gecs/`
 - `check_project.py --build --ecs` passes with no FAIL lines
 - At least 1 Component file and 1 System file exist
-- `tests/e2e/conftest.py` exists
+- `e2e/conftest.py` exists
 - Git repo initialized with at least one commit
 
 Note: Unit test coverage is intentionally NOT checked at Gate 3 -- systems are empty stubs.

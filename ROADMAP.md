@@ -50,12 +50,10 @@ This roadmap tracks what has shipped, what we are working on now, and where the 
 
 ## Future / Exploring
 
-### Product Evolution
+### Permission & Pipeline
 
-- `R-201` **Harness: TypeScript CLI** — External generator-evaluator loop controller. State machine drives build→verify→evaluate→accept cycle with independent Claude Code sessions. Save/resume support.
-- `R-202` **Hooks migration to JS** — Convert Python hooks to plain JS (esbuild-compiled from TS) to eliminate Python dependency for end users. Users only need Node.js + Godot.
-- `R-203` **Orchestrator skill decomposition** — Split monolithic orchestrator SKILL.md into independent skills (/build, /evaluate, /verify) with defined interfaces. Users can invoke skills manually; harness calls them programmatically.
-- `R-204` **Desktop application** — Tauri (Rust + Svelte) desktop app wrapping the TS harness. Project management UI, asset browser, real-time preview. Target: GitButler-style standalone experience.
+- `R-070` **Permission isolation upgrade** — Current e2e/ permission isolation uses a file lock (`.godotmaker/current_role`). Explore stronger mechanisms: agent-type-based identity (GSD-style skill→agent dispatch), or harness-injected env vars. Goal: tamper-proof role separation without extra subagent nesting.
+- `R-071` **Pipeline decomposition** — Split monolithic orchestrator skill into independent orchestrator + evaluator roles with dedicated skills and agent definitions. Evaluator owns e2e/ exclusively, orchestrator owns planning + worker dispatch.
 
 ### Framework Features
 

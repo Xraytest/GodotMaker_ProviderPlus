@@ -214,8 +214,8 @@ def check_e2e(project_dir: Path, result: CheckResult):
         else:
             result.fail("godot-e2e not found (no addon directory, plugin not enabled)")
 
-    # Check for e2e test files in standard directory: tests/e2e/
-    e2e_dir = project_dir / "tests" / "e2e"
+    # Check for e2e test files in standard directory: e2e/
+    e2e_dir = project_dir / "e2e"
     e2e_files = []
     if e2e_dir.exists():
         e2e_files = list(e2e_dir.glob("test_*.py"))
@@ -233,9 +233,9 @@ def check_e2e(project_dir: Path, result: CheckResult):
     # Check conftest.py exists
     conftest = e2e_dir / "conftest.py" if e2e_dir.exists() else None
     if conftest and conftest.exists():
-        result.ok("tests/e2e/conftest.py exists")
+        result.ok("e2e/conftest.py exists")
     else:
-        result.warn("tests/e2e/conftest.py not found — E2E tests may use wrong imports")
+        result.warn("e2e/conftest.py not found — E2E tests may use wrong imports")
 
     if e2e_files:
         result.ok(f"Found {len(e2e_files)} e2e test file(s): "
@@ -258,7 +258,7 @@ def check_e2e(project_dir: Path, result: CheckResult):
                 result.warn(f"e2e file {e2e_file.name} may contain "
                             "placeholder content (TODO/stub)")
     else:
-        result.fail("No e2e test files found in tests/e2e/")
+        result.fail("No e2e test files found in e2e/")
 
 
 def check_plan(project_dir: Path, result: CheckResult):

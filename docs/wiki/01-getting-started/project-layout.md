@@ -19,7 +19,7 @@ my-game/
   systems/
   entities/                  (optional)
   test/
-  tests/e2e/
+  e2e/
   addons/
     gecs/
     gdunit4/
@@ -132,13 +132,14 @@ Run tests via:
 godot --headless -s addons/gdunit4/bin/gdunit4_run.gd --single --file res://test/movement_system_test.gd
 ```
 
-### tests/e2e/
+### e2e/
 
-End-to-end tests using godot-e2e. These tests run the actual game, capture screenshots, and verify gameplay behavior.
+End-to-end tests using godot-e2e. These tests run the actual game, capture screenshots, and verify gameplay behavior. This directory is owned by the external Evaluator.
 
 ```
-tests/e2e/
-  bounce_e2e.gd
+e2e/
+  conftest.py
+  test_movement.py
   ...
 ```
 
