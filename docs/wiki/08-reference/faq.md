@@ -40,7 +40,7 @@ A milestone is one complete pass through the pipeline: from `/gm-gdd` (write the
 
 You can stop at any point. The next time you open the project, the `session_start.py` hook reads `.godotmaker/stage.jsonl` to see where you left off, and the active role skill shows you a resume summary. Just run the same `/gm-*` command again to pick up where you stopped.
 
-For a full walkthrough of recovery scenarios, see `04-troubleshooting/recovery-and-resume.md`.
+For a full walkthrough of recovery scenarios, see [Recovery & Resume](../04-troubleshooting/recovery-and-resume.md).
 
 ### Can I run two `/gm-*` commands at the same time?
 
@@ -81,7 +81,7 @@ Yes, and your edits will be preserved. Be aware that if you run `/gm-build` agai
 
 Plain Godot node scripts tend to mix data, logic, and scene structure in one file. As the game grows, these files get harder to change without breaking something. ECS separates concerns cleanly: data lives in components, logic lives in systems, and entities are just IDs that connect them. For AI-generated code this matters a lot — new behaviour is always a new component plus a new system, not an edit to an existing 1000-line script.
 
-For a longer explanation, see `02-concepts/why-ecs.md`.
+For a longer explanation, see [ECS in plain English](../02-concepts/ecs-in-plain-english.md).
 
 ### How do I know if the build succeeded?
 
@@ -107,7 +107,7 @@ Yes. GodotMaker only deploys files into your folder and then the AI fills them i
 
 Hooks have a built-in anti-deadloop limit. `check_completion.py` allows up to 5 consecutive blocks before force-allowing; `check_worker_report.py` allows up to 2 blocks per sub-agent. If you are hitting these limits repeatedly something in the pipeline has gone wrong — check the failing sub-agent's report for missing sections or malformed output.
 
-For common hook errors and how to read them, see `04-troubleshooting/common-problems.md`.
+For common hook errors and how to read them, see [Common problems](../04-troubleshooting/common-problems.md).
 
 ### I get "fatal: not a valid object name: HEAD" when a worker starts.
 
