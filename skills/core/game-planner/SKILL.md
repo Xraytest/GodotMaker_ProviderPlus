@@ -43,8 +43,12 @@ through implications:
 
 ## Interview Structure
 
-The interview is organized around GDD sections. Progress through them in order,
-but adapt — some games need more depth in certain areas, less in others.
+The flow has two phases:
+
+1. **Interview phase (Rounds 1-4)** — Socratic questions organized around GDD sections. Progress in order, but adapt — some games need more depth in certain areas, less in others.
+2. **Audit phase (Rounds 5-7)** — synthesize a draft GDD, then run **two fixed rounds of independent audit** (`gdd-auditor` subagent) to catch the blind spots the interview missed. Each audit round produces 5-8 follow-up questions delivered to the user in a single batch.
+
+Round 8 is the user's final review (Ask Maker mode). Do not skip the audit rounds — they exist precisely because interview-only flows leak details (pause behavior, failure recovery, balance numbers, mechanic interactions) that bite later.
 
 ### Round 1 — Game Identity (GDD §1-2)
 
@@ -122,11 +126,11 @@ Example questions:
 - "For SFX, what actions need sound feedback — jumping, attacking, collecting items?"
 - "Art-wise, are you thinking pixel art, vector, or something else?"
 
-### Round 5 — Synthesis
+### Round 5 — Synthesis (GDD v1)
 
 Only start this after Rounds 1-4 are complete (with appropriate sections skipped).
 
-Compile everything into the GDD using the template at `.claude/templates/GDD.md`.
+Compile everything into the GDD using the template at `.claude/templates/GDD.md`. The draft GDD stays internal across Rounds 5-7 — do NOT show any version to the user until v3 is ready in Round 8.
 
 Rules for synthesis:
 - Use the template as a reference, NOT a rigid requirement
@@ -134,7 +138,88 @@ Rules for synthesis:
 - Add custom sections if the game needs them
 - Fill in smart defaults for anything the user said "your call" about
 
-### Round 6 — Review & Ask Maker
+### Round 6 — Audit Pass 1 (GDD v1 → v2)
+
+Spawn the **`gdd-auditor`** subagent with a fresh context. Pass it the full GDD v1 and the iteration number `1`.
+
+```
+Agent({
+  subagent_type: "gdd-auditor",
+  description: "Audit GDD draft (pass 1)",
+  model: "{auditor_model from .godotmaker/config.yaml, default: opus}",
+  prompt: "{audit brief below}"
+})
+```
+
+Audit brief:
+
+```
+## Audit: GDD draft, iteration 1
+
+### GDD Content
+{inline GDD v1 content here}
+
+### Iteration
+1
+
+### Game Genre Hint
+{genre from Round 1}
+```
+
+The auditor returns 5-8 follow-up questions. Present them to the user **in one batch** (do not ask them one-by-one):
+
+> "I've drafted the GDD, but before showing it to you I had an independent reviewer audit it. They flagged {N} gaps worth filling in. Please answer these in one go — anything you don't have a strong opinion on, just say 'your call':
+>
+> 1. **[State & Lifecycle]** Can the player pause? If so, does pausing freeze audio too? *(default: yes to both)*
+> 2. **[Failure & Recovery]** When the player dies, do they restart the level or hit a checkpoint?
+> 3. ..."
+>
+> "Reply with answers (or 'your call' for any item) and I'll fold them into v2."
+
+Wait for the user's batched answers, then update the GDD → **v2**.
+
+### Round 7 — Audit Pass 2 (GDD v2 → v3)
+
+Spawn the auditor again with iteration `2`. **You MUST populate the `Previously Asked` field with the exact questions asked in Round 6** — otherwise the auditor will re-ask the same gaps.
+
+```
+Agent({
+  subagent_type: "gdd-auditor",
+  description: "Audit GDD draft (pass 2)",
+  model: "{auditor_model from .godotmaker/config.yaml, default: opus}",
+  prompt: "{audit brief below}"
+})
+```
+
+Audit brief:
+
+```
+## Audit: GDD draft, iteration 2
+
+### GDD Content
+{inline GDD v2 content here}
+
+### Iteration
+2
+
+### Previously Asked (do not repeat)
+- {Round 6 question 1, verbatim}
+- {Round 6 question 2, verbatim}
+- ...
+
+### Game Genre Hint
+{genre from Round 1}
+```
+
+The second pass typically finds finer-grained issues: contradictions introduced by the v2 edits, balance numbers still vague, mechanic interactions still undefined.
+
+Present the second batch to the user the same way:
+
+> "Second and final audit pass — {N} more questions. Same rule: 'your call' is fine for anything you don't care about."
+
+Fold the answers into the GDD → **v3**. This is the version the user reviews in Round 8.
+
+### Round 8 — Review & Ask Maker
 
 Present the complete GDD to the user for review.
 
