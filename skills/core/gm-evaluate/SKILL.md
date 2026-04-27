@@ -21,13 +21,13 @@ You are an independent game quality evaluator. You have NOT seen the build proce
 
 ## Resume Check
 
-Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`. Build the set of completed roles from these events.
+Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`.
 
-- If `verify` has not completed → STOP. Tell user to run `/gm-verify` first.
-- If `evaluate` has already completed AND `.godotmaker/evaluation.json` exists → STOP. Tell the user:
-  > "Role 'evaluate' was already completed at {timestamp}. Recommended next: /gm-accept (if approved) or /gm-fixgap (if rejected).
+- If **no event with `role == "verify"`** exists anywhere in the file → STOP. Tell user to run `/gm-verify` first.
+- If the **last event** has `role == "evaluate"` AND `.godotmaker/evaluation.json` exists → STOP. Tell the user:
+  > "Evaluate already ran at {timestamp} with no verify since. Recommended next: /gm-accept (if approved) or /gm-fixgap (if rejected).
   > If you need to redo this step or have other plans, just tell me."
-- Otherwise → proceed.
+- Otherwise → proceed (evaluate is naturally re-invoked after each verify pass).
 
 ## Evaluation Process
 
@@ -46,7 +46,7 @@ Build a checklist of every feature, scene, and mechanic described in GDD.md. Thi
 Write E2E tests in `e2e/` that exercise every GDD feature:
 
 1. Read `.claude/skills/godot-e2e/SKILL.md` for the API
-2. Ensure `e2e/conftest.py` exists (create if missing, use template from `.claude/skills/orchestrator/stages/stage3_scaffold.md`)
+2. Ensure `e2e/conftest.py` exists (scaffold creates it; if missing, copy the template from `.claude/skills/gm-scaffold/SKILL.md` § "E2E conftest.py template")
 3. For each GDD feature, write a test that:
    - Launches the game to the relevant scene
    - Exercises the feature through input simulation

@@ -1,9 +1,9 @@
 """End-to-end tests for the gm-* role-based pipeline.
 
-Simulates the full setup → build → verify → evaluate → accept → finalize
-lifecycle by writing state files and invoking hooks. Verifies that hooks
-enforce the right rules at each transition and that role permissions
-align with each gm-* skill's contract.
+Simulates the full scaffold → gdd → asset → build → verify → evaluate →
+accept → finalize lifecycle by writing state files and invoking hooks.
+Verifies that hooks enforce the right rules at each transition and that
+role permissions align with each gm-* skill's contract.
 
 These tests don't run real Claude sessions — they exercise the file-state
 machinery (current_role, stage.jsonl, evaluation.json, final_report.json)
@@ -92,28 +92,81 @@ def project_dir():
 
 
 # ---------------------------------------------------------------------------
-# Phase 1 — Setup transitions
+# Phase 1 — Scaffold + GDD + Asset (replaces old monolithic Setup)
 # ---------------------------------------------------------------------------
 
-class TestSetupPhase:
-    def test_build_blocked_before_setup(self, project_dir):
-        """Worker dispatch in build role must fail until setup completes."""
+def scaffold_done():
+    """Mark scaffold artifacts present (project.godot is the canonical marker)."""
+    open("project.godot", "w").close()
+
+
+class TestScaffoldPhase:
+    def test_scaffold_completion_requires_project_godot(self, project_dir):
+        """stage_reminder blocks scaffold completion until project.godot exists."""
+        code, parsed = run_hook("stage_reminder.py",
+                                write_stage_payload({"scaffold": "2026-01-01T00:00:00Z"}))
+        assert is_blocked(parsed)
+
+    def test_scaffold_completion_succeeds_with_project_godot(self, project_dir):
+        scaffold_done()
+        code, parsed = run_hook("stage_reminder.py",
+                                write_stage_payload({"scaffold": "2026-01-01T00:00:00Z"}))
+        assert code == 0
+        assert not is_blocked(parsed)
+        ctx = parsed["hookSpecificOutput"]["additionalContext"]
+        assert "/gm-gdd" in ctx
+
+
+class TestGDDPhase:
+    def test_build_blocked_before_gdd(self, project_dir):
+        """Worker dispatch in build role must fail until gdd completes."""
+        scaffold_done()
         write_current_role("build")
         code, parsed = run_hook("check_stage_prerequisites.py", agent_dispatch_payload())
         assert is_blocked(parsed)
 
-    def test_setup_completion_requires_files(self, project_dir):
-        """stage_reminder blocks setup completion until required files exist."""
+    def test_gdd_completion_requires_files(self, project_dir):
         code, parsed = run_hook("stage_reminder.py",
-                                write_stage_payload({"setup": "2026-01-01T00:00:00Z"}))
+                                write_stage_payload({"gdd": "2026-01-01T01:00:00Z"}))
         assert is_blocked(parsed)
 
-    def test_setup_completion_succeeds_with_files(self, project_dir):
+    def test_gdd_completion_succeeds_with_files(self, project_dir):
         for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
             open(f, "w").close()
         code, parsed = run_hook("stage_reminder.py",
-                                write_stage_payload({"setup": "2026-01-01T00:00:00Z"}))
+                                write_stage_payload({"gdd": "2026-01-01T01:00:00Z"}))
         assert code == 0
+        assert not is_blocked(parsed)
+        ctx = parsed["hookSpecificOutput"]["additionalContext"]
+        assert "/gm-asset" in ctx
+
+
+class TestAssetPhase:
+    def test_asset_dispatch_passes_through_with_no_prereqs(self, project_dir):
+        """Asset role self-validates via SKILL.md Resume Check; the dispatch
+        hook does NOT enforce stage-schema prereqs for asset. This test pins
+        the intentional design — even with project.godot, gdd, and required
+        files all missing, the hook lets the dispatch through. If asset is
+        ever added back to WORKER_DISPATCH_ROLES, this test starts failing."""
+        write_current_role("asset")
+        # No project.godot, no completed gdd, no GDD.md / PLAN.md / STRUCTURE.md.
+        code, parsed = run_hook("check_stage_prerequisites.py", agent_dispatch_payload())
+        assert code == 0
+        assert not is_blocked(parsed)
+
+    def test_asset_main_can_only_write_assets_md(self, project_dir):
+        write_current_role("asset")
+        _, parsed = run_hook("check_file_permissions.py",
+                             file_write_payload("ASSETS.md"))
+        assert not is_blocked(parsed)
+        for path in ["assets/sprite.png", "PLAN.md", "src/x.gd"]:
+            _, parsed = run_hook("check_file_permissions.py",
+                                 file_write_payload(path))
+            assert is_blocked(parsed), f"asset main must block {path}"
+
+    def test_asset_completion_reminds_build(self, project_dir):
+        _, parsed = run_hook("stage_reminder.py",
+                             write_stage_payload({"asset": "2026-01-01T01:30:00Z"}))
         assert not is_blocked(parsed)
         ctx = parsed["hookSpecificOutput"]["additionalContext"]
         assert "/gm-build" in ctx
@@ -124,20 +177,21 @@ class TestSetupPhase:
 # ---------------------------------------------------------------------------
 
 class TestBuildPhase:
-    def setup_complete(self):
+    def gdd_complete(self):
+        scaffold_done()
         for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
             open(f, "w").close()
-        write_completed_roles({"setup": "2026-01-01T00:00:00Z"})
+        write_completed_roles({"gdd": "2026-01-01T01:00:00Z"})
 
-    def test_worker_dispatch_allowed_after_setup(self, project_dir):
-        self.setup_complete()
+    def test_worker_dispatch_allowed_after_gdd(self, project_dir):
+        self.gdd_complete()
         write_current_role("build")
         code, parsed = run_hook("check_stage_prerequisites.py", agent_dispatch_payload())
         assert code == 0
         assert not is_blocked(parsed)
 
     def test_orchestrator_cannot_write_game_code(self, project_dir):
-        self.setup_complete()
+        self.gdd_complete()
         write_current_role("build")
         for ext in [".gd", ".tscn", ".tres"]:
             _, parsed = run_hook("check_file_permissions.py",
@@ -145,33 +199,33 @@ class TestBuildPhase:
             assert is_blocked(parsed), f"build orchestrator must not write {ext}"
 
     def test_orchestrator_can_update_plan(self, project_dir):
-        self.setup_complete()
+        self.gdd_complete()
         write_current_role("build")
         _, parsed = run_hook("check_file_permissions.py",
                              file_write_payload("PLAN.md"))
         assert not is_blocked(parsed)
 
     def test_worker_blocked_from_e2e(self, project_dir):
-        self.setup_complete()
+        self.gdd_complete()
         write_current_role("build")
         _, parsed = run_hook("check_file_permissions.py",
                              file_write_payload("e2e/test_x.py", agent_id="w1"))
         assert is_blocked(parsed)
 
     def test_build_completion_blocks_with_pending_tasks(self, project_dir):
-        self.setup_complete()
+        self.gdd_complete()
         with open("PLAN.md", "w") as f:
             f.write("# Plan\n| 1 | move | pending |\n")
         _, parsed = run_hook("stage_reminder.py",
-                             write_stage_payload({"build": "2026-01-01T01:00:00Z"}))
+                             write_stage_payload({"build": "2026-01-01T02:00:00Z"}))
         assert is_blocked(parsed)
 
     def test_build_completion_succeeds_when_all_verified(self, project_dir):
-        self.setup_complete()
+        self.gdd_complete()
         with open("PLAN.md", "w") as f:
             f.write("# Plan\n| 1 | move | verified |\n| 2 | jump | verified |\n")
         _, parsed = run_hook("stage_reminder.py",
-                             write_stage_payload({"build": "2026-01-01T01:00:00Z"}))
+                             write_stage_payload({"build": "2026-01-01T02:00:00Z"}))
         assert not is_blocked(parsed)
         ctx = parsed["hookSpecificOutput"]["additionalContext"]
         assert "/gm-verify" in ctx
@@ -249,14 +303,14 @@ class TestEvaluatePhase:
 class TestFixgapPhase:
     def test_fixgap_blocked_without_evaluation(self, project_dir):
         write_current_role("fixgap")
-        write_completed_roles({"setup": "t1", "build": "t2", "verify": "t3"})
+        write_completed_roles({"gdd": "t1", "build": "t2", "verify": "t3"})
         _, parsed = run_hook("check_stage_prerequisites.py", agent_dispatch_payload())
         assert is_blocked(parsed)
 
     def test_fixgap_allowed_after_evaluation(self, project_dir):
         write_current_role("fixgap")
         write_completed_roles({
-            "setup": "t1", "build": "t2", "verify": "t3", "evaluate": "t4",
+            "gdd": "t1", "build": "t2", "verify": "t3", "evaluate": "t4",
         })
         with open(".godotmaker/evaluation.json", "w") as f:
             f.write('{"result": "reject"}')
@@ -270,8 +324,9 @@ class TestFixgapPhase:
         ctx = parsed["hookSpecificOutput"]["additionalContext"]
         assert "/gm-verify" in ctx
 
-    def test_fixgap_reviewer_optional(self, project_dir):
-        """Fixgap diligence requires verifier but not reviewer."""
+    def test_fixgap_requires_full_diligence(self, project_dir):
+        """Fixgap diligence requires both verifier AND reviewer
+        (mirrors gm-fixgap Hard Rule 6 + Step 4)."""
         write_current_role("fixgap")
         write_metrics([
             {"event": "subagent_start", "agent_id": "w1", "role": "worker"},
@@ -281,8 +336,8 @@ class TestFixgapPhase:
             "hook_event_name": "Stop",
             "agent_id": "",
         })
-        assert code == 0
-        assert not is_blocked(parsed)
+        assert is_blocked(parsed), "Fixgap with no reviewer must block"
+        assert "reviewer" in parsed.get("reason", "").lower()
 
 
 # ---------------------------------------------------------------------------
@@ -343,63 +398,85 @@ class TestFullLifecycleHappyPath:
     """Walk through every role transition for a happy-path build."""
 
     def test_full_pipeline(self, project_dir):
-        # Setup
-        write_current_role("setup")
+        # Scaffold
+        write_current_role("scaffold")
+        open("project.godot", "w").close()
+        _, parsed = run_hook("stage_reminder.py",
+                             write_stage_payload({"scaffold": "t0"}))
+        assert "/gm-gdd" in parsed["hookSpecificOutput"]["additionalContext"]
+
+        # GDD
+        write_completed_roles({"scaffold": "t0"})
+        write_current_role("gdd")
         for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
             open(f, "w").close()
         _, parsed = run_hook("stage_reminder.py",
-                             write_stage_payload({"setup": "t1"}))
+                             write_stage_payload({"scaffold": "t0", "gdd": "t1"}))
+        assert "/gm-asset" in parsed["hookSpecificOutput"]["additionalContext"]
+
+        # Asset
+        write_completed_roles({"scaffold": "t0", "gdd": "t1"})
+        write_current_role("asset")
+        _, parsed = run_hook("stage_reminder.py",
+                             write_stage_payload({"scaffold": "t0", "gdd": "t1", "asset": "t1b"}))
         assert "/gm-build" in parsed["hookSpecificOutput"]["additionalContext"]
 
         # Build
-        write_completed_roles({"setup": "t1"})
+        write_completed_roles({"scaffold": "t0", "gdd": "t1", "asset": "t1b"})
         write_current_role("build")
         _, parsed = run_hook("check_stage_prerequisites.py", agent_dispatch_payload())
         assert not is_blocked(parsed)
         with open("PLAN.md", "w") as f:
             f.write("# Plan\n| 1 | x | verified |\n")
         _, parsed = run_hook("stage_reminder.py",
-                             write_stage_payload({"setup": "t1", "build": "t2"}))
+                             write_stage_payload({"scaffold": "t0", "gdd": "t1",
+                                                  "asset": "t1b", "build": "t2"}))
         assert "/gm-verify" in parsed["hookSpecificOutput"]["additionalContext"]
 
         # Verify
-        write_completed_roles({"setup": "t1", "build": "t2"})
+        write_completed_roles({"scaffold": "t0", "gdd": "t1",
+                               "asset": "t1b", "build": "t2"})
         write_current_role("verify")
         _, parsed = run_hook("stage_reminder.py", write_stage_payload(
-            {"setup": "t1", "build": "t2", "verify": "t3"}))
+            {"scaffold": "t0", "gdd": "t1", "asset": "t1b",
+             "build": "t2", "verify": "t3"}))
         assert "/gm-evaluate" in parsed["hookSpecificOutput"]["additionalContext"]
 
         # Evaluate (approve)
-        write_completed_roles({"setup": "t1", "build": "t2", "verify": "t3"})
+        write_completed_roles({"scaffold": "t0", "gdd": "t1", "asset": "t1b",
+                               "build": "t2", "verify": "t3"})
         write_current_role("evaluate")
         with open(".godotmaker/evaluation.json", "w") as f:
             f.write('{"result": "approve"}')
         _, parsed = run_hook("stage_reminder.py", write_stage_payload(
-            {"setup": "t1", "build": "t2", "verify": "t3", "evaluate": "t4"}))
+            {"scaffold": "t0", "gdd": "t1", "asset": "t1b",
+             "build": "t2", "verify": "t3", "evaluate": "t4"}))
         ctx = parsed["hookSpecificOutput"]["additionalContext"]
         assert "/gm-accept" in ctx
 
         # Accept
         write_completed_roles({
-            "setup": "t1", "build": "t2", "verify": "t3", "evaluate": "t4",
+            "scaffold": "t0", "gdd": "t1", "asset": "t1b",
+            "build": "t2", "verify": "t3", "evaluate": "t4",
         })
         write_current_role("accept")
         _, parsed = run_hook("stage_reminder.py", write_stage_payload({
-            "setup": "t1", "build": "t2", "verify": "t3",
-            "evaluate": "t4", "accept": "t5",
+            "scaffold": "t0", "gdd": "t1", "asset": "t1b",
+            "build": "t2", "verify": "t3", "evaluate": "t4", "accept": "t5",
         }))
         assert "/gm-finalize" in parsed["hookSpecificOutput"]["additionalContext"]
 
         # Finalize
         write_completed_roles({
-            "setup": "t1", "build": "t2", "verify": "t3",
-            "evaluate": "t4", "accept": "t5",
+            "scaffold": "t0", "gdd": "t1", "asset": "t1b",
+            "build": "t2", "verify": "t3", "evaluate": "t4", "accept": "t5",
         })
         write_current_role("finalize")
         with open(".godotmaker/final_report.json", "w") as f:
             f.write('{"status": "completed"}')
         code, parsed = run_hook("stage_reminder.py", write_stage_payload({
-            "setup": "t1", "build": "t2", "verify": "t3", "evaluate": "t4",
+            "scaffold": "t0", "gdd": "t1", "asset": "t1b",
+            "build": "t2", "verify": "t3", "evaluate": "t4",
             "accept": "t5", "finalize": "t6",
         }))
         assert code == 0

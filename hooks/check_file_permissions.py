@@ -1,27 +1,10 @@
 #!/usr/bin/env python3
 """PreToolUse hook: enforce file write permissions per pipeline role.
 
-Uses .godotmaker/current_role to determine the active role, then applies
-role-specific write rules. The role file is set by each gm-* skill at
-session start.
-
-Main-agent rules (per role):
-  - setup:    may scaffold code/docs; e2e/ blocked (Evaluator-owned)
-  - build:    may NOT write game code (must dispatch worker); e2e/ blocked
-  - verify:   read-only outside .godotmaker/ (state updates allowed)
-  - evaluate: may ONLY write e2e/ or .godotmaker/evaluation.json
-  - fixgap:   same as build
-  - accept:   may update planning docs; no game code; no e2e/
-  - finalize: may update planning docs; no game code; no e2e/
-
-Subagent rules (any role):
-  - never write planning docs (PLAN.md / STRUCTURE.md / ASSETS.md / GAP.md)
-  - never write to e2e/ (Evaluator-owned)
-  - may write game code (that is their job in build/fixgap)
-
-If no current_role is set (legacy/unknown), falls back to original rules:
-  - main agent: blocked from game code
-  - subagent: blocked from planning docs
+Reads .godotmaker/current_role and applies the role's write rules. See the
+gm-*/SKILL.md files for the canonical per-role rules; this hook enforces
+them. When no role is set, falls back to legacy rules (main agent blocked
+from game code, subagents blocked from planning docs).
 """
 import json
 import os
@@ -33,12 +16,17 @@ from metrics import record_event, EventType, get_current_role, WORKER_DISPATCH_R
 GAME_CODE_EXTENSIONS = {".gd", ".tscn", ".tres"}
 PLANNING_DOCS = {"plan.md", "structure.md", "assets.md", "gap.md"}
 E2E_DIR_PREFIX = "e2e/"
+ASSETS_DIR_PREFIX = "assets/"
 GODOTMAKER_DIR = ".godotmaker/"
 EVAL_FILE = ".godotmaker/evaluation.json"
 
 
 def _is_e2e_path(path_lower: str) -> bool:
     return path_lower.startswith(E2E_DIR_PREFIX) or f"/{E2E_DIR_PREFIX}" in path_lower
+
+
+def _is_assets_path(path_lower: str) -> bool:
+    return path_lower.startswith(ASSETS_DIR_PREFIX) or f"/{ASSETS_DIR_PREFIX}" in path_lower
 
 
 def _is_godotmaker_path(path_lower: str) -> bool:
@@ -66,28 +54,44 @@ def _check_main(role: str, path_lower: str, file_name: str, ext: str) -> None:
     is_code = ext in GAME_CODE_EXTENSIONS
     is_eval = _is_eval_file(path_lower)
     is_godotmaker = _is_godotmaker_path(path_lower)
+    is_assets = _is_assets_path(path_lower)
 
     if role == "evaluate":
-        # Strictest: only e2e/ and evaluation.json
-        if not (is_e2e or is_eval):
-            _block(f"Evaluator can only write to e2e/ or {EVAL_FILE} "
+        if not (is_e2e or is_godotmaker):
+            _block(f"Evaluator can only write to e2e/ or .godotmaker/ "
                    f"(attempted: {file_name}).", file_name)
         return
 
     if role == "verify":
-        # Read-only except for .godotmaker/ runtime state (e.g., stage.jsonl)
         if not is_godotmaker:
             _block(f"Verify role is read-only — cannot write {file_name}.", file_name)
         return
 
-    # setup / build / fixgap / accept / finalize: e2e/ always blocked for main
+    if role == "scaffold":
+        return
+
     if is_e2e:
         _block(f"{role.capitalize()} role cannot write to e2e/ ({file_name}). "
                "E2E tests are owned by the Evaluator.", file_name)
 
-    # Only setup may scaffold game code directly. All other roles must dispatch
-    # a worker (build/fixgap) or simply not write code (accept/finalize).
-    if is_code and role != "setup":
+    if role == "asset":
+        if path_lower == "assets.md" or is_godotmaker:
+            return
+        _block(f"Asset orchestrator can only write the project-root ASSETS.md "
+               f"or .godotmaker/ (attempted: {file_name}). Image files go "
+               f"through tools/asset_gen.py (Bash) or the analyst subagent.",
+               file_name)
+
+    if role == "gdd":
+        if is_assets:
+            _block(f"GDD role cannot write to assets/ ({file_name}). "
+                   "Asset files are produced during /gm-asset.", file_name)
+        if ext == ".md" or file_name == "project.godot" or is_godotmaker:
+            return
+        _block(f"GDD role may only write planning docs, project.godot, or "
+               f".godotmaker/ (attempted: {file_name}).", file_name)
+
+    if is_code:
         if role in WORKER_DISPATCH_ROLES:
             _block(f"{role.capitalize()} orchestrator cannot write game code directly "
                    f"({file_name}). Dispatch a Worker subagent.", file_name)

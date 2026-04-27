@@ -2,12 +2,12 @@
 """Stop hook: verify orchestrator diligence in worker-dispatching roles.
 
 Only enforced when current_role is "build" or "fixgap" — these are the roles
-that dispatch workers and require verifier/reviewer rounds. Other roles
-(setup, verify, evaluate, accept, finalize) self-enforce via their SKILL.md
-Resume Check and skip this hook.
+that dispatch workers and require verifier + reviewer rounds. Other roles
+(scaffold, gdd, asset, verify, evaluate, accept, finalize) self-enforce via
+their SKILL.md Resume Check and skip this hook.
 
-Diligence rule: if workers were dispatched in this session, verifiers must
-have run too. Reviewer is required for build, optional for fixgap.
+Diligence rule: if workers were dispatched in this session, both verifier
+and reviewer must have run too (per gm-build/gm-fixgap Hard Rule 6).
 
 Anti-deadloop: if blocked BLOCK_LIMIT times in the same session, allow with
 a warning rather than blocking again.
@@ -29,8 +29,8 @@ BLOCK_LIMIT = 5
 LIFECYCLE_EVENTS = (EventType.SUBAGENT_START, EventType.SUBAGENT_STOP)
 
 
-def check_diligence(events: list[dict], require_reviewer: bool) -> list[str]:
-    """Check that workers had verifiers (and optionally reviewers) dispatched."""
+def check_diligence(events: list[dict], require_reviewer: bool = True) -> list[str]:
+    """Check that workers had verifiers (and reviewers) dispatched."""
     if not events:
         return []
 
@@ -97,8 +97,7 @@ def main():
         sys.exit(0)
 
     events = read_current_events()
-    require_reviewer = (role == "build")
-    issues = check_diligence(events, require_reviewer=require_reviewer)
+    issues = check_diligence(events, require_reviewer=True)
 
     if issues:
         state.increment("stop_block_count")

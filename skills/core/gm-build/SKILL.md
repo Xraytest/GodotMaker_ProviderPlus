@@ -1,7 +1,7 @@
 ---
 name: gm-build
 description: |
-  Implement game systems via worker dispatch. Covers Stage 5 (Risk) and Stage 6 (Main).
+  Implement game systems via worker dispatch. Covers risk-first then main implementation.
   Dispatches workers continuously, triggers verification every ≥5 completed workers.
   Explicit invocation only — use /gm-build.
 disable-model-invocation: true
@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 $ARGUMENTS
 
-You are implementing a Godot game by dispatching Worker subagents. This covers Stage 5 (Risk Implementation) and Stage 6 (Main Implementation).
+You are implementing a Godot game by dispatching Worker subagents. Risk tasks first, then main tasks — both surfaced from PLAN.md.
 
 ## Session Setup
 
@@ -19,11 +19,12 @@ You are implementing a Godot game by dispatching Worker subagents. This covers S
 
 ## Resume Check
 
-Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`. Build the set of completed roles from these events.
+Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`.
 
-- If `setup` has not completed → STOP. Tell user to run `/gm-setup` first.
-- If `build` has already completed AND all PLAN.md tasks are `verified` → STOP. Tell the user:
-  > "Role 'build' was already completed at {timestamp}. Recommended next: /gm-verify.
+- If `project.godot` does not exist → STOP. Tell user to run `/gm-scaffold` first.
+- If **no event with `role == "gdd"`** exists anywhere in the file → STOP. Tell user to run `/gm-gdd` first.
+- If the **last event** has `role == "build"` AND all PLAN.md tasks are `verified` → STOP. Tell the user:
+  > "Build already completed for this milestone at {timestamp}. Recommended next: /gm-verify.
   > If you need to redo this step or have other plans, just tell me."
 - Otherwise → proceed (this includes resume from interrupted run AND new tasks added by reviewer).
 

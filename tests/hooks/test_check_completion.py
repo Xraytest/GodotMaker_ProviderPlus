@@ -29,7 +29,8 @@ def project_dir():
 class TestRoleSkipping:
     """Roles other than build/fixgap should skip the diligence check."""
 
-    @pytest.mark.parametrize("role", ["setup", "verify", "evaluate", "accept", "finalize"])
+    @pytest.mark.parametrize("role",
+                             ["scaffold", "gdd", "asset", "verify", "evaluate", "accept", "finalize"])
     def test_non_worker_roles_skipped(self, project_dir, role):
         write_current_role(role)
         write_metrics([
@@ -119,7 +120,7 @@ class TestBuildDiligence:
 
 
 class TestFixgapDiligence:
-    """Fixgap requires verifier but reviewer is optional."""
+    """Fixgap requires both verifier AND reviewer (mirrors gm-fixgap Hard Rule 6)."""
 
     def test_workers_without_verifier_blocked(self, project_dir):
         write_current_role("fixgap")
@@ -133,12 +134,25 @@ class TestFixgapDiligence:
         assert is_blocked(parsed)
         assert "verifier" in parsed.get("reason", "").lower()
 
-    def test_no_reviewer_required(self, project_dir):
-        """Fixgap doesn't require a reviewer."""
+    def test_workers_without_reviewer_blocked(self, project_dir):
         write_current_role("fixgap")
         write_metrics([
             {"event": "subagent_start", "agent_id": "w1", "role": "worker"},
             {"event": "subagent_start", "agent_id": "v1", "role": "verifier"},
+        ])
+        _, _, parsed = run_hook(HOOK, {
+            "hook_event_name": "Stop",
+            "agent_id": "",
+        })
+        assert is_blocked(parsed), "Fixgap with verifier but no reviewer must block"
+        assert "reviewer" in parsed.get("reason", "").lower()
+
+    def test_full_diligence_passes(self, project_dir):
+        write_current_role("fixgap")
+        write_metrics([
+            {"event": "subagent_start", "agent_id": "w1", "role": "worker"},
+            {"event": "subagent_start", "agent_id": "v1", "role": "verifier"},
+            {"event": "subagent_start", "agent_id": "r1", "role": "reviewer"},
         ])
         _, code, parsed = run_hook(HOOK, {
             "hook_event_name": "Stop",

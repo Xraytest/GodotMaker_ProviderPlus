@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """PreToolUse hook (Agent tool): verify role prerequisites before worker dispatch.
 
-Only enforces for roles that dispatch workers:
-  - build → requires setup completed + its files present
+Only enforces for roles that drive worker orchestration:
+  - build → requires gdd completed + scaffold artifacts present
   - fixgap → requires evaluate completed + evaluation.json present
 
-Other roles (setup, verify, evaluate, accept, finalize) don't dispatch workers
-and skip this check.
+Scaffold artifacts are checked on disk because scaffold events are archived
+per-milestone.
+
+Other dispatching roles (asset → analyst) self-validate via their SKILL.md
+Resume Check; their preconditions don't match this hook's stage-schema model.
 """
 import json
 import os
@@ -21,7 +24,7 @@ from metrics import (
 
 
 PREREQ_ROLE = {
-    "build": "setup",
+    "build": "gdd",
     "fixgap": "evaluate",
 }
 
@@ -30,6 +33,10 @@ assert frozenset(PREREQ_ROLE) == WORKER_DISPATCH_ROLES, (
     f"PREREQ_ROLE keys {sorted(PREREQ_ROLE)} must equal "
     f"WORKER_DISPATCH_ROLES {sorted(WORKER_DISPATCH_ROLES)}"
 )
+
+# Roles that need scaffold artifacts on disk (lifetime-once, not in stage.jsonl
+# after first milestone's archive).
+SCAFFOLD_REQUIRED = frozenset({"build"})
 
 
 def main():
@@ -52,6 +59,9 @@ def main():
 
     completed = get_completed_roles()
     issues = []
+
+    if role in SCAFFOLD_REQUIRED and not os.path.isfile("project.godot"):
+        issues.append("project.godot not found — run /gm-scaffold first")
 
     if prereq not in completed:
         issues.append(f"Role '{prereq}' has not completed yet — run /gm-{prereq} first")

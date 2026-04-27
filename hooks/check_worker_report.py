@@ -423,7 +423,7 @@ def build_progress_reminder() -> str | None:
         f"[Progress] Workers: {workers} done | "
         f"Verifiers: {verifiers} | Reviewers: {reviewers}. "
         f"Reminder: Every worker needs a verifier + reviewer. "
-        f"Do NOT stop without completing Stage 7 + 8."
+        f"Do NOT stop before /gm-verify completes."
     )
 
 

@@ -18,7 +18,9 @@ from metrics import (
 )
 
 ROLE_NEXT = {
-    "setup": "/gm-build",
+    "scaffold": "/gm-gdd",
+    "gdd": "/gm-asset",
+    "asset": "/gm-build",
     "build": "/gm-verify",
     "verify": "/gm-evaluate",
     "evaluate": "/gm-accept (if approved) or /gm-fixgap (if rejected)",

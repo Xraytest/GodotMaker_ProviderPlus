@@ -103,7 +103,7 @@ Workers with **no file ownership overlap** can run in parallel using git worktre
 ### When to parallelize
 
 - Two or more tasks have **completely disjoint file sets** (no shared .gd/.tscn/.tres files)
-- Both tasks are in the same stage (Stage 5 or 6)
+- Both tasks are in the same `/gm-build` cycle (risk or main phase)
 - Neither task depends on the other's output
 
 ### How to dispatch

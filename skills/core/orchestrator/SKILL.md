@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: |
-  DEPRECATED — use gm-setup, gm-build, gm-verify, gm-evaluate, gm-accept, gm-finalize instead.
+  DEPRECATED — use gm-scaffold, gm-gdd, gm-asset, gm-build, gm-verify, gm-evaluate, gm-fixgap, gm-accept, gm-finalize instead.
   This skill is retained as a support directory for stage definitions and dispatch templates
   referenced by the new pipeline skills.
 ---

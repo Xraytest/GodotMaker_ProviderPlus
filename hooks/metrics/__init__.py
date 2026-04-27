@@ -23,10 +23,14 @@ from .schema import (
 from . import state
 
 
-PIPELINE_ROLES = ("setup", "build", "verify", "evaluate", "fixgap", "accept", "finalize")
+PIPELINE_ROLES = (
+    "scaffold", "gdd", "asset",
+    "build", "verify", "evaluate", "fixgap", "accept", "finalize",
+)
 
-# Roles that dispatch worker subagents (and therefore must satisfy the
-# prerequisite/file-permission rules around worker dispatch).
+# Roles that drive a worker-orchestration workflow (worker → verifier →
+# reviewer rounds). Subject to prereq + scaffold-artifact checks on Agent
+# dispatch and to diligence checks on Stop.
 WORKER_DISPATCH_ROLES = frozenset({"build", "fixgap"})
 
 STAGE_SCHEMAS_PATH = os.path.join(".godotmaker", "stage_schemas.json")

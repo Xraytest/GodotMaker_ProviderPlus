@@ -20,11 +20,14 @@ You are fixing specific issues identified by the Evaluator. You read the evaluat
 
 ## Resume Check
 
-Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`. Build the set of completed roles from these events.
+Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`.
 
-- If `evaluate` has not completed OR `.godotmaker/evaluation.json` does not exist → STOP. Tell user to run `/gm-evaluate` first.
+- If **no event with `role == "evaluate"`** exists anywhere in the file OR `.godotmaker/evaluation.json` does not exist → STOP. Tell user to run `/gm-evaluate` first.
 - If `evaluation.json` `result` is `"approve"` → STOP. Tell the user:
   > "The latest evaluation was already approved. Recommended next: /gm-accept.
+  > If you need to redo this step or have other plans, just tell me."
+- If the **last event** has `role == "fixgap"` AND `GAP.md` is not at project root (already archived) → STOP. Tell the user:
+  > "Fixgap already completed for the latest evaluation at {timestamp}. Recommended next: /gm-verify.
   > If you need to redo this step or have other plans, just tell me."
 - Otherwise → proceed (fresh fixgap or repeat fixgap is both valid).
 

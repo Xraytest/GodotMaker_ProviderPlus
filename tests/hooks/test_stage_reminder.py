@@ -62,7 +62,7 @@ class TestNonStageWrites:
             "tool_name": "Write",
             "tool_input": {
                 "file_path": ".godotmaker/stage.jsonl",
-                "content": stage_jsonl([{"role": "setup", "ts": "2026-01-01T00:00:00Z"}]),
+                "content": stage_jsonl([{"role": "gdd", "ts": "2026-01-01T00:00:00Z"}]),
             },
         })
         assert code == 0
@@ -70,7 +70,23 @@ class TestNonStageWrites:
 
 
 class TestRoleReminder:
-    def test_setup_complete_reminds_build(self, project_dir):
+    def test_scaffold_complete_reminds_gdd(self, project_dir):
+        open("project.godot", "w").close()
+        _, code, parsed = run_hook(HOOK, {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": ".godotmaker/stage.jsonl",
+                "content": stage_jsonl([{"role": "scaffold", "ts": "2026-01-01T00:00:00Z"}]),
+            },
+        })
+        assert code == 0
+        assert parsed is not None
+        ctx = parsed["hookSpecificOutput"]["additionalContext"]
+        assert "/gm-gdd" in ctx
+        assert "scaffold" in ctx
+
+    def test_gdd_complete_reminds_asset(self, project_dir):
         for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
             open(f, "w").close()
         _, code, parsed = run_hook(HOOK, {
@@ -78,14 +94,28 @@ class TestRoleReminder:
             "tool_name": "Write",
             "tool_input": {
                 "file_path": ".godotmaker/stage.jsonl",
-                "content": stage_jsonl([{"role": "setup", "ts": "2026-01-01T00:00:00Z"}]),
+                "content": stage_jsonl([{"role": "gdd", "ts": "2026-01-01T00:00:00Z"}]),
+            },
+        })
+        assert code == 0
+        assert parsed is not None
+        ctx = parsed["hookSpecificOutput"]["additionalContext"]
+        assert "/gm-asset" in ctx
+        assert "gdd" in ctx
+
+    def test_asset_complete_reminds_build(self, project_dir):
+        _, code, parsed = run_hook(HOOK, {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": ".godotmaker/stage.jsonl",
+                "content": stage_jsonl([{"role": "asset", "ts": "2026-01-01T00:30:00Z"}]),
             },
         })
         assert code == 0
         assert parsed is not None
         ctx = parsed["hookSpecificOutput"]["additionalContext"]
         assert "/gm-build" in ctx
-        assert "setup" in ctx
 
     def test_evaluate_complete_reminds_accept_or_fixgap(self, project_dir):
         with open(".godotmaker/evaluation.json", "w") as f:
@@ -96,7 +126,7 @@ class TestRoleReminder:
             "tool_input": {
                 "file_path": ".godotmaker/stage.jsonl",
                 "content": stage_jsonl([
-                    {"role": "setup", "ts": "2026-01-01T00:00:00Z"},
+                    {"role": "gdd", "ts": "2026-01-01T00:00:00Z"},
                     {"role": "evaluate", "ts": "2026-01-01T05:00:00Z"},
                 ]),
             },
@@ -128,15 +158,15 @@ class TestRoleReminder:
             "tool_name": "Write",
             "tool_input": {
                 "file_path": "D:\\Games\\MyGame\\.godotmaker\\stage.jsonl",
-                "content": stage_jsonl([{"role": "setup", "ts": "2026-01-01T00:00:00Z"}]),
+                "content": stage_jsonl([{"role": "gdd", "ts": "2026-01-01T00:00:00Z"}]),
             },
         })
         assert code == 0
         assert parsed is not None
         ctx = parsed["hookSpecificOutput"]["additionalContext"]
-        assert "/gm-build" in ctx
+        assert "/gm-asset" in ctx
 
-    def test_edit_tool(self, project_dir):
+    def test_edit_tool_for_gdd_event_reminds_asset(self, project_dir):
         for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
             open(f, "w").close()
         _, code, parsed = run_hook(HOOK, {
@@ -145,13 +175,13 @@ class TestRoleReminder:
             "tool_input": {
                 "file_path": ".godotmaker/stage.jsonl",
                 "old_string": '',
-                "new_string": '{"role": "setup", "ts": "2026-01-01T00:00:00Z"}\n',
+                "new_string": '{"role": "gdd", "ts": "2026-01-01T00:00:00Z"}\n',
             },
         })
         assert code == 0
         assert parsed is not None
         ctx = parsed["hookSpecificOutput"]["additionalContext"]
-        assert "/gm-build" in ctx
+        assert "/gm-asset" in ctx
 
 
 class TestValidation:
@@ -162,7 +192,7 @@ class TestValidation:
             "tool_name": "Write",
             "tool_input": {
                 "file_path": ".godotmaker/stage.jsonl",
-                "content": stage_jsonl([{"role": "setup", "ts": "2026-01-01T00:00:00Z"}]),
+                "content": stage_jsonl([{"role": "gdd", "ts": "2026-01-01T00:00:00Z"}]),
             },
         })
         assert is_blocked(parsed)

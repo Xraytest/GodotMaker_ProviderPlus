@@ -45,7 +45,8 @@ def project_dir():
 
 
 class TestRoleSkipping:
-    @pytest.mark.parametrize("role", ["setup", "verify", "evaluate", "accept", "finalize"])
+    @pytest.mark.parametrize("role",
+                             ["scaffold", "gdd", "asset", "verify", "evaluate", "accept", "finalize"])
     def test_non_dispatch_roles_pass_through(self, project_dir, role):
         write_current_role(role)
         _, code, parsed = run_hook(HOOK, AGENT_INPUT)
@@ -58,24 +59,67 @@ class TestRoleSkipping:
         assert not is_blocked(parsed)
 
 
+class TestAssetIntentionallyUnenforced:
+    """Asset role dispatches analyst, not workers; this hook does NOT check
+    asset's preconditions (project.godot / ASSETS.md). Asset self-validates
+    via SKILL.md Resume Check. These tests pin that intentional design — if
+    asset is later added to PREREQ_ROLE in check_stage_prerequisites.py, the
+    bypass tests below will start failing (because the hook will then look up
+    a prereq role and enforce its files exist)."""
+
+    def test_asset_passes_with_no_prereqs_at_all(self, project_dir):
+        write_current_role("asset")
+        # No project.godot, no completed gdd, no GDD.md/PLAN.md/STRUCTURE.md.
+        # Hook still allows because asset is not in WORKER_DISPATCH_ROLES.
+        _, code, parsed = run_hook(HOOK, AGENT_INPUT)
+        assert code == 0
+        assert not is_blocked(parsed)
+
+    def test_asset_passes_even_when_only_scaffold_missing(self, project_dir):
+        write_current_role("asset")
+        write_completed_roles(["gdd"])
+        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
+            open(f, "w").close()
+        # project.godot deliberately absent — would block build, but asset is
+        # exempt from the SCAFFOLD_REQUIRED check.
+        _, code, parsed = run_hook(HOOK, AGENT_INPUT)
+        assert code == 0
+        assert not is_blocked(parsed)
+
+
 class TestBuildPrerequisites:
-    def test_block_when_setup_not_complete(self, project_dir):
+    def test_block_when_scaffold_artifact_missing(self, project_dir):
         write_current_role("build")
+        write_completed_roles(["gdd"])
+        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
+            open(f, "w").close()
+        # No project.godot
+        _, _, parsed = run_hook(HOOK, AGENT_INPUT)
+        assert is_blocked(parsed)
+        reason = parsed.get(
+            "hookSpecificOutput", {}).get("permissionDecisionReason", "").lower()
+        assert "project.godot" in reason or "scaffold" in reason
+
+    def test_block_when_gdd_not_complete(self, project_dir):
+        write_current_role("build")
+        open("project.godot", "w").close()
         # No completed roles
         _, _, parsed = run_hook(HOOK, AGENT_INPUT)
         assert is_blocked(parsed)
-        assert "setup" in parsed.get(
+        assert "gdd" in parsed.get(
             "hookSpecificOutput", {}).get("permissionDecisionReason", "").lower()
 
-    def test_block_when_setup_complete_but_files_missing(self, project_dir):
+    def test_block_when_gdd_complete_but_files_missing(self, project_dir):
         write_current_role("build")
-        write_completed_roles(["setup"])
+        open("project.godot", "w").close()
+        write_completed_roles(["gdd"])
         _, _, parsed = run_hook(HOOK, AGENT_INPUT)
         assert is_blocked(parsed)
 
-    def test_allow_when_setup_files_present(self, project_dir):
+    def test_allow_when_gdd_files_and_scaffold_present(self, project_dir):
         write_current_role("build")
-        write_completed_roles(["setup"])
+        open("project.godot", "w").close()
+        write_completed_roles(["gdd"])
         for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
             open(f, "w").close()
         _, code, parsed = run_hook(HOOK, AGENT_INPUT)
@@ -86,20 +130,20 @@ class TestBuildPrerequisites:
 class TestFixgapPrerequisites:
     def test_block_when_evaluate_not_complete(self, project_dir):
         write_current_role("fixgap")
-        write_completed_roles(["setup", "build", "verify"])  # no evaluate
+        write_completed_roles(["gdd", "build", "verify"])  # no evaluate
         _, _, parsed = run_hook(HOOK, AGENT_INPUT)
         assert is_blocked(parsed)
 
     def test_block_when_evaluation_json_missing(self, project_dir):
         write_current_role("fixgap")
-        write_completed_roles(["setup", "build", "verify", "evaluate"])
+        write_completed_roles(["gdd", "build", "verify", "evaluate"])
         # but no evaluation.json
         _, _, parsed = run_hook(HOOK, AGENT_INPUT)
         assert is_blocked(parsed)
 
     def test_allow_when_evaluation_complete(self, project_dir):
         write_current_role("fixgap")
-        write_completed_roles(["setup", "build", "verify", "evaluate"])
+        write_completed_roles(["gdd", "build", "verify", "evaluate"])
         with open(".godotmaker/evaluation.json", "w") as f:
             f.write('{"result": "reject"}')
         _, code, parsed = run_hook(HOOK, AGENT_INPUT)

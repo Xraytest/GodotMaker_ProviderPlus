@@ -118,16 +118,26 @@ class TestRoleBased:
     """Role-based permissions per current_role file."""
 
     @pytest.mark.parametrize("ext", [".gd", ".tscn", ".tres"])
-    def test_setup_can_write_game_code(self, project_dir, ext):
-        write_current_role("setup")
+    def test_scaffold_can_write_game_code(self, project_dir, ext):
+        write_current_role("scaffold")
         _, _, parsed = run_hook(HOOK, {
             "tool_name": "Write",
             "tool_input": {"file_path": f"scripts/x{ext}"},
             "agent_id": "",
         })
-        assert not is_blocked(parsed), "Setup may scaffold game code"
+        assert not is_blocked(parsed), "Scaffold may write game code"
 
-    @pytest.mark.parametrize("role", ["setup", "build", "fixgap", "accept", "finalize"])
+    def test_scaffold_can_write_e2e_conftest(self, project_dir):
+        """Scaffold creates the initial e2e/conftest.py — permissive role."""
+        write_current_role("scaffold")
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "e2e/conftest.py"},
+            "agent_id": "",
+        })
+        assert not is_blocked(parsed), "Scaffold must be able to seed e2e/conftest.py"
+
+    @pytest.mark.parametrize("role", ["gdd", "asset", "build", "fixgap", "accept", "finalize"])
     def test_main_blocked_from_e2e(self, project_dir, role):
         write_current_role(role)
         _, _, parsed = run_hook(HOOK, {
@@ -146,6 +156,73 @@ class TestRoleBased:
             "agent_id": "",
         })
         assert is_blocked(parsed)
+
+    def test_gdd_can_write_planning_docs(self, project_dir):
+        write_current_role("gdd")
+        for path in ["GDD.md", "PLAN.md", "STRUCTURE.md", "ASSETS.md", "SCENES.md", "TOC.md"]:
+            _, _, parsed = run_hook(HOOK, {
+                "tool_name": "Write",
+                "tool_input": {"file_path": path},
+                "agent_id": "",
+            })
+            assert not is_blocked(parsed), f"gdd must allow {path}"
+
+    def test_gdd_can_write_project_godot(self, project_dir):
+        write_current_role("gdd")
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "project.godot"},
+            "agent_id": "",
+        })
+        assert not is_blocked(parsed), "gdd may tweak project.godot for design changes"
+
+    @pytest.mark.parametrize("ext", [".gd", ".tscn", ".tres"])
+    def test_gdd_blocked_from_game_code(self, project_dir, ext):
+        write_current_role("gdd")
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": f"src/x{ext}"},
+            "agent_id": "",
+        })
+        assert is_blocked(parsed), f"gdd must not write {ext}"
+
+    def test_gdd_blocked_from_assets_dir(self, project_dir):
+        write_current_role("gdd")
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "assets/sprite.png"},
+            "agent_id": "",
+        })
+        assert is_blocked(parsed), "gdd must not write to assets/"
+
+    def test_asset_can_write_assets_md(self, project_dir):
+        write_current_role("asset")
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "ASSETS.md"},
+            "agent_id": "",
+        })
+        assert not is_blocked(parsed)
+
+    def test_asset_can_write_godotmaker(self, project_dir):
+        write_current_role("asset")
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": ".godotmaker/state.json"},
+            "agent_id": "",
+        })
+        assert not is_blocked(parsed)
+
+    def test_asset_blocked_from_other_files(self, project_dir):
+        write_current_role("asset")
+        for path in ["assets/sprite.png", "PLAN.md", "STRUCTURE.md", "SCENES.md",
+                     "GAP.md", "src/x.gd", "GDD.md", "subdir/ASSETS.md"]:
+            _, _, parsed = run_hook(HOOK, {
+                "tool_name": "Write",
+                "tool_input": {"file_path": path},
+                "agent_id": "",
+            })
+            assert is_blocked(parsed), f"asset orchestrator must block {path}"
 
     def test_verify_is_read_only(self, project_dir):
         write_current_role("verify")
@@ -171,6 +248,17 @@ class TestRoleBased:
         _, _, parsed = run_hook(HOOK, {
             "tool_name": "Write",
             "tool_input": {"file_path": ".godotmaker/evaluation.json"},
+            "agent_id": "",
+        })
+        assert not is_blocked(parsed)
+
+    def test_evaluate_can_write_stage_jsonl(self, project_dir):
+        """Evaluate must append its completion event to .godotmaker/stage.jsonl
+        (per gm-evaluate SKILL.md 'When Done')."""
+        write_current_role("evaluate")
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": ".godotmaker/stage.jsonl"},
             "agent_id": "",
         })
         assert not is_blocked(parsed)

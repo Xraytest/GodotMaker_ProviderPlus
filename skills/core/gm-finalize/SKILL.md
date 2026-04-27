@@ -20,10 +20,10 @@ You are finalizing a completed game project. Your job is to ensure everything is
 
 Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y, ...}`.
 
-- If no `accept` event with `decision == "accept"` exists in the log → STOP. Tell user to run `/gm-accept` first.
+- If **no event with `role == "accept"` and `decision == "accept"`** exists anywhere in the file → STOP. Tell user to run `/gm-accept` first.
   (Events with `decision == "fix"` or `decision == "done"` are trace records, not completions.)
-- If `finalize` has already completed AND `.godotmaker/final_report.json` exists → STOP. Tell the user:
-  > "Role 'finalize' was already completed at {timestamp}. Project is finalized. Nothing left to do — you can ship.
+- If the **last event** has `role == "finalize"` → STOP. Tell the user:
+  > "Finalize already recorded at {timestamp}. Project milestone is closed. Run /gm-gdd to start a new milestone.
   > If you need to redo this step or have other plans, just tell me."
 - Otherwise → proceed.
 
@@ -80,29 +80,55 @@ Read `.godotmaker/stage.jsonl` for the actual completed-role events. Write `.god
 
 Append a line to `.godotmaker/stage.jsonl`: `{"role": "finalize", "ts": "<UTC ISO timestamp>"}`. Read the existing file (treat as empty if missing), append the new event, and write the full file back.
 
-### 5. Clean Up Runtime State
+### 5. Archive Milestone State
 
-Remove or reset `.godotmaker` runtime artifacts:
+Close the milestone by moving its transient state into `.godotmaker/milestones/<N>/`. Subsequent milestones start with a clean slate.
+
+**Determine milestone number N:**
+```
+N = (number of existing subdirectories under .godotmaker/milestones/) + 1
+```
+Create `.godotmaker/milestones/<N>/` if needed.
+
+**Move into the milestone directory:**
+- `.godotmaker/stage.jsonl` → `.godotmaker/milestones/<N>/stage.jsonl`
+- `PLAN.md` → `.godotmaker/milestones/<N>/PLAN.md`
+- `.godotmaker/evaluation.json` → `.godotmaker/milestones/<N>/evaluation.json`
+- `.godotmaker/final_report.json` → `.godotmaker/milestones/<N>/final_report.json`
+- `.godotmaker/gaps/` (if exists) → `.godotmaker/milestones/<N>/gaps/`
+- `e2e/screenshots/` (if exists) → `.godotmaker/milestones/<N>/screenshots/` — next milestone's evaluator captures fresh ones; archived snapshots preserve audit trail
+
+**Keep at project root (cumulative across milestones):**
+- `GDD.md`, `STRUCTURE.md`, `ASSETS.md`, `SCENES.md`, `TOC.md`
+- `MEMORY.md` and `memory/`
+- All game code (`src/`, `scenes/`, `e2e/` (test files only — screenshots archived above), `assets/`, `references/`, `addons/`, `project.godot`)
+
+After archive, the next `/gm-gdd` invocation sees an empty `stage.jsonl` and treats it as a new milestone.
+
+### 6. Clean Up Runtime State
+
+Remove or reset remaining `.godotmaker` runtime artifacts:
 - Delete `.godotmaker/current_role` (no lingering role lock)
-- Delete `.godotmaker/metrics_current.jsonl` (session metrics — history in metrics.jsonl is preserved)
+- Delete `.godotmaker/metrics_current.jsonl` (session metrics — history in `metrics.jsonl` is preserved)
 - Delete `.godotmaker/traces/` directory (debug traces)
-- Keep: `stage.jsonl`, `evaluation.json`, `final_report.json`, `config.yaml`, `hooks/`, `version`
+- Keep: `.godotmaker/milestones/`, `.godotmaker/config.yaml`, `.godotmaker/hooks/`, `.godotmaker/version`, `.godotmaker/metrics.jsonl`
 
-### 6. Inform User
+### 7. Inform User
 
 Present a concise completion summary:
 
 ```
-## Project Complete
+## Milestone {N} Complete
 
-**{game_name}** is ready.
+**{game_name}** milestone {N} is shipped.
 
 - {N} systems, {M} components
 - {X} unit tests, {Y} e2e tests
 - Documents updated: {list or "none needed"}
 - Unresolved issues: {list or "none"}
 - Known limitations: {list or "none"}
+- Archived to: .godotmaker/milestones/{N}/
 
 To run: {instructions}
-To iterate: use /gm-setup for new features, /gm-fixgap for targeted fixes
+To start a new milestone: /gm-gdd
 ```

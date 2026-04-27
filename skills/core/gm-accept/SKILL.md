@@ -19,14 +19,14 @@ You are presenting the completed game to the user for acceptance.
 
 ## Resume Check
 
-Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`. Build the set of completed roles from these events. Also read `.godotmaker/evaluation.json`.
+Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`. Also read `.godotmaker/evaluation.json`.
 
-- If `evaluate` has not completed OR `evaluation.json` does not exist → STOP. Tell user to run `/gm-evaluate` first.
+- If **no event with `role == "evaluate"`** exists anywhere in the file OR `evaluation.json` does not exist → STOP. Tell user to run `/gm-evaluate` first.
 - If `evaluation.json` `result` is `"reject"` → STOP. Tell user to run `/gm-fixgap` first.
-- If `accept` has already completed → STOP. Tell the user:
-  > "Role 'accept' was already completed at {timestamp}. Recommended next: /gm-finalize.
+- If the **last event** has `role == "accept"` AND its `decision == "accept"` → STOP. Tell the user:
+  > "Accept already recorded at {timestamp}. Recommended next: /gm-finalize.
   > If you need to redo this step or have other plans, just tell me."
-- Otherwise → proceed.
+- Otherwise → proceed (re-invocation is valid if the previous accept event recorded a `fix` or `done` decision).
 
 ## Process
 

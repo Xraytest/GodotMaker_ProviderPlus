@@ -1,7 +1,11 @@
 {
-  "setup": {
+  "scaffold": {
+    "files": ["project.godot"]
+  },
+  "gdd": {
     "files": ["GDD.md", "PLAN.md", "STRUCTURE.md"]
   },
+  "asset": {},
   "build": {
     "checks": ["plan_all_verified"]
   },

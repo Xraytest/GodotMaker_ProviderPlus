@@ -18,13 +18,13 @@ You are performing mechanical verification of a built Godot game project. This i
 
 ## Resume Check
 
-Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`. Build the set of completed roles from these events.
+Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`.
 
-- If `build` has not completed → STOP. Tell user to run `/gm-build` first.
-- If `verify` has already completed → STOP. Tell the user:
-  > "Role 'verify' was already completed at {timestamp}. Recommended next: /gm-evaluate.
+- If **no event with `role == "build"` AND no event with `role == "fixgap"`** exists anywhere in the file → STOP. Tell user to run `/gm-build` first.
+- If the **last event** has `role == "verify"` → STOP. Tell the user:
+  > "Verify already ran at {timestamp} with no state-changing event since. Recommended next: /gm-evaluate.
   > If you need to redo this step or have other plans, just tell me."
-- Otherwise → proceed.
+- Otherwise → proceed (verify is naturally re-invoked after each build/fixgap cycle).
 
 ## Verification Checklist
 
@@ -87,9 +87,11 @@ Output: {paste PASS/FAIL lines}
 
 If any check fails:
 1. Identify the failing system from the output
-2. Inform the user which checks failed and suggest running `/gm-build` to fix
+2. Tell the user which checks failed. Suggest the right next step based on context:
+   - If the last state-changing event was `build` → suggest `/gm-build` (the build cycle continues)
+   - If the last state-changing event was `fixgap` → suggest `/gm-fixgap` (the gap-fix cycle continues)
 
-Do NOT dispatch workers or make code changes. Verify only reports — fixing is `/gm-build`'s job.
+Do NOT dispatch workers or make code changes. Verify only reports — fixing happens in `/gm-build` or `/gm-fixgap`.
 
 ## When Done
 
