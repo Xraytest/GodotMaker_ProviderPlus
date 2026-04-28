@@ -31,11 +31,12 @@ ROLE_NEXT = {
 
 # Sanity check: ROLE_NEXT must cover every pipeline role. Catches drift at
 # import time when a new role is added to PIPELINE_ROLES without updating the
-# next-step mapping here.
-assert set(ROLE_NEXT) == set(PIPELINE_ROLES), (
-    f"ROLE_NEXT keys {sorted(ROLE_NEXT)} must equal "
-    f"PIPELINE_ROLES {sorted(PIPELINE_ROLES)}"
-)
+# next-step mapping here. Explicit raise survives `python -O`.
+if set(ROLE_NEXT) != set(PIPELINE_ROLES):
+    raise RuntimeError(
+        f"ROLE_NEXT keys {sorted(ROLE_NEXT)} must equal "
+        f"PIPELINE_ROLES {sorted(PIPELINE_ROLES)}"
+    )
 
 
 # ---------------------------------------------------------------------------

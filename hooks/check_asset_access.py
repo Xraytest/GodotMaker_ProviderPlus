@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: block orchestrator from directly reading image files in assets/.
+"""PreToolUse hook: block the dispatching role from directly reading image
+files in assets/.
 
-The orchestrator must delegate asset analysis to an analyst subagent.
-Subagents are allowed to read assets — only the main agent (empty agent_id) is blocked.
+The dispatching role (the active /gm-* skill in the main session) must delegate
+asset analysis to an analyst subagent. Subagents are allowed to read assets —
+only the main agent (empty agent_id) is blocked.
 """
 import json
 import os
@@ -24,7 +26,7 @@ def main():
     if data.get("tool_name") != "Read":
         sys.exit(0)
 
-    # Only block main agent (orchestrator), not subagents
+    # Only block the main agent (the dispatching role), not subagents
     agent_id = data.get("agent_id", "")
     if agent_id:
         sys.exit(0)  # Subagent — allow
@@ -47,9 +49,9 @@ def main():
     if ext not in IMAGE_EXTENSIONS:
         sys.exit(0)  # Non-image files (e.g., .json, .ogg) are OK
 
-    # Block — orchestrator trying to read image in assets/
+    # Block — dispatching role trying to read image in assets/
     reason = (
-        f"Orchestrator cannot read image files in assets/ directly. "
+        f"The dispatching role cannot read image files in assets/ directly. "
         f"Dispatch an analyst subagent to analyze '{os.path.basename(file_path)}' instead. "
         f"See analyst-dispatch.md for the protocol."
     )

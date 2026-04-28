@@ -66,6 +66,21 @@ Hook 注册关系（哪个脚本响应哪个事件）存储在 `config/settings.
 
 派发协议（调用格式和 brief 模板）位于 `skills/core/_shared/{worker,verifier,reviewer,analyst}-dispatch.md`。`gdd-auditor` 直接由 `skills/core/game-planner/SKILL.md` 内联调用。
 
+### 两轮 GDD 审计
+
+`gdd-auditor` 是唯一一个派发协议**不**放在 `_shared/` 里的子 Agent。它只在 `game-planner` 的 Round 6 + Round 7 调用，派发逻辑离开那段访谈脚本就没意义。把它提到 `_shared/` 只会增加跳转，不会带来复用。
+
+两轮，全部在新上下文中跑，使用同一个 `subagent_type`：
+
+| 轮次 | Round | 输入 | 输出 | 这一轮存在的理由 |
+|------|-------|------|------|------------------|
+| 1 | Round 6 | GDD v1 + 空的 `Previously Asked` | 5–8 个补问 | 捕捉 planner 在访谈中遗漏的缺口 |
+| 2 | Round 7 | GDD v2 + Round 6 的**完整原文**问题列表（填入 `Previously Asked`） | 5–8 个**新**问题 | 强迫 auditor 看二级缺口而不是重复自己 |
+
+Round 7 brief 中的 `Previously Asked` 字段是必填项，不是可选项。不填就等于让 auditor 在新上下文里完全没有 pass 1 的记忆，结果会重复同样的问题、白白浪费一轮。`game-planner` SKILL.md 用 `**You MUST populate**` 标记这个字段，`gdd-auditor.md` 也把"在 `Previously Asked` 中重复问题"列为硬性禁止——两层一起强制同一份契约。
+
+`auditor_model` 默认值是 `sonnet`（在 `config/config.yaml.default` 中配置）；审计任务是 checklist 驱动的，不需要 opus 级推理。
+
 ---
 
 ## skills/core/

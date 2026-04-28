@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop hook: verify orchestrator diligence in worker-dispatching roles.
+"""Stop hook: verify dispatcher diligence in worker-dispatching roles.
 
 Only enforced when current_role is "build" or "fixgap" — these are the roles
 that dispatch workers and require verifier + reviewer rounds. Other roles

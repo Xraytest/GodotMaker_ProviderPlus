@@ -66,6 +66,21 @@ Sub-agent definitions, one Markdown file per agent. Each file has YAML front-mat
 
 The dispatch protocols (call format and brief templates) live in `skills/core/_shared/{worker,verifier,reviewer,analyst}-dispatch.md`. `gdd-auditor` is invoked inline from `skills/core/game-planner/SKILL.md`.
 
+### The two-pass GDD audit
+
+`gdd-auditor` is the only sub-agent whose dispatch protocol does **not** live in `_shared/`. It is invoked from one place (`game-planner` Rounds 6 + 7) and the dispatch only makes sense as part of that interview script. Promoting it to `_shared/` would add indirection without buying reuse.
+
+Two passes, both fresh-context, both invoked with the same `subagent_type`:
+
+| Pass | Round | Input | Output | Why this pass exists |
+|------|-------|-------|--------|---------------------|
+| 1 | Round 6 | GDD v1 + empty `Previously Asked` | 5–8 follow-up questions | Catches gaps the planner missed during the interview |
+| 2 | Round 7 | GDD v2 + the **exact** Round-6 questions in `Previously Asked` | 5–8 *new* questions | Forces the auditor to look at second-tier gaps instead of repeating itself |
+
+The `Previously Asked` field in the Round 7 brief is mandatory, not advisory. Without it the auditor has no memory of pass 1 (fresh context) and re-asks the same questions, wasting a round. `game-planner` SKILL.md marks the field with `**You MUST populate**` and `gdd-auditor.md` lists "repeating questions in `Previously Asked`" as a hard prohibition — both layers enforce the same contract.
+
+`auditor_model` defaults to `sonnet` (in `config/config.yaml.default`); the audit task is checklist-driven and does not need opus-tier reasoning.
+
 ---
 
 ## skills/core/

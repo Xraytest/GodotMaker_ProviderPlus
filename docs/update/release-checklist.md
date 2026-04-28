@@ -36,7 +36,33 @@ Steps to follow when publishing a new version of GodotMaker.
    gitleaks detect --source . --config .gitleaks.toml
    ```
 
-5. **Commit and push**
+5. **Cross-layer consistency gates** — these catch the contract drifts that
+   shipped past previous releases. Run before tagging.
+
+   - **README + wiki entry-flow consistency.** The first command shown in
+     `README.md`, `README.zh-CN.md`, and `docs/wiki/01-getting-started/first-game.md`
+     must match. For a new project this is `/gm-scaffold`; `/gm-gdd` is the
+     entry only when starting a new milestone on an existing project.
+   - **New config keys are in `config.yaml.default`.** Any `*_model` field
+     newly referenced by a skill must also be declared in
+     `config/config.yaml.default` with the same default value. The automated
+     check is `tests/test_config_consistency.py`; if you add a new
+     `<role>_model`, run pytest before tagging.
+   - **Documented artifacts match real outputs.** If a wiki page or skill
+     description claims a role produces a file (e.g., `.godotmaker/foo.json`),
+     either the role's `SKILL.md` actually writes that file or the doc claim
+     is removed. There is no "documented but not produced" file in the
+     pipeline.
+   - **Release notes are visible.** Every new `docs/update/vX.Y.Z.md` must
+     appear under the `Release Notes` section of `mkdocs.yml`. Adding the
+     archive without the nav entry hides it from the published site.
+   - **Chinese release-note policy.** Release notes under `docs/update/` are
+     **English-only by design** — the i18n plugin shows the same English
+     page on the Chinese site rather than maintaining a parallel translation
+     track. If this policy ever changes, mirror notes under `docs/zh/update/`
+     and update this checklist.
+
+6. **Commit and push**
    ```bash
    git add -A
    git commit -m "chore: prepare release vX.Y.Z"
@@ -45,7 +71,7 @@ Steps to follow when publishing a new version of GodotMaker.
 
 ## Publish
 
-5. **Create a git tag and push**
+7. **Create a git tag and push**
    ```bash
    git tag vX.Y.Z
    git push origin vX.Y.Z
@@ -54,11 +80,11 @@ Steps to follow when publishing a new version of GodotMaker.
    - Reads release notes from `docs/update/vX.Y.Z.md`
    - Creates a GitHub Release (source code archives are attached by GitHub)
 
-6. **Verify the release**
+8. **Verify the release**
    - Check the [Releases page](https://github.com/RandallLiuXin/GodotMaker/releases)
    - Verify release notes match `CHANGELOG.md`
 
 ## Post-release
 
-7. **Announce** (optional)
+9. **Announce** (optional)
    - Post on relevant communities (Godot forums, Reddit, etc.)

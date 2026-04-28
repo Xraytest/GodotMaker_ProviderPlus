@@ -90,15 +90,15 @@ Workers may create shared utility functions. Follow these rules:
 
 1. **Location**: All utility/helper functions go in `src/utils/` directory.
 2. **One file per domain**: e.g., `src/utils/math_utils.gd`, `src/utils/spawn_utils.gd`.
-3. **After creating utilities**: Report them in your MEMORY entry so orchestrator can update the utils API doc.
+3. **After creating utilities**: Report them in your MEMORY entry so the dispatching role can update the utils API doc.
 4. **Before creating utilities**: Check `.godotmaker/utils_api.md` (if it exists) for existing utilities. Do NOT duplicate.
-5. **Orchestrator responsibility**: After each worker completes, update `.godotmaker/utils_api.md` with new utility function signatures and descriptions. Include this doc path in subsequent worker briefs under "Input Files".
+5. **Dispatching-role responsibility**: After each worker completes, the dispatching role updates `.godotmaker/utils_api.md` with new utility function signatures and descriptions. Include this doc path in subsequent worker briefs under "Input Files".
 
 ---
 
 ## Parallel Worker Dispatch (Worktree Isolation)
 
-Workers with **no file ownership overlap** can run in parallel using git worktree isolation. This lets the orchestrator continue dispatching without waiting for each worker to finish.
+Workers with **no file ownership overlap** can run in parallel using git worktree isolation. This lets the dispatching role continue dispatching without waiting for each worker to finish.
 
 ### When to parallelize
 

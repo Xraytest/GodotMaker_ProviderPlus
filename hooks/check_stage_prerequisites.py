@@ -29,10 +29,12 @@ PREREQ_ROLE = {
 }
 
 # Sanity check: PREREQ_ROLE must cover exactly the worker-dispatching roles.
-assert frozenset(PREREQ_ROLE) == WORKER_DISPATCH_ROLES, (
-    f"PREREQ_ROLE keys {sorted(PREREQ_ROLE)} must equal "
-    f"WORKER_DISPATCH_ROLES {sorted(WORKER_DISPATCH_ROLES)}"
-)
+# Use an explicit raise instead of assert so the check survives `python -O`.
+if frozenset(PREREQ_ROLE) != WORKER_DISPATCH_ROLES:
+    raise RuntimeError(
+        f"PREREQ_ROLE keys {sorted(PREREQ_ROLE)} must equal "
+        f"WORKER_DISPATCH_ROLES {sorted(WORKER_DISPATCH_ROLES)}"
+    )
 
 # Roles that need scaffold artifacts on disk (lifetime-once, not in stage.jsonl
 # after first milestone's archive).
