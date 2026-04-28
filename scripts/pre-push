@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Pre-push hook: run the same checks CI runs, before they reach the remote.
+# Mirrors .github/workflows/ci.yml (lint-python + test-python steps).
+# Installed by scripts/install-hooks.sh
+#
+# To skip in an emergency: git push --no-verify
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+echo "[pre-push] Running CI-equivalent checks locally..."
+
+# 1. ruff (mirrors CI lint-python)
+if command -v ruff &> /dev/null; then
+    echo "[pre-push] -> ruff check ."
+    ruff check .
+else
+    echo "[pre-push] WARNING: ruff not found. Install: pip install ruff"
+    echo "[pre-push] Skipping lint."
+fi
+
+# 2. pytest (mirrors CI test-python). --tb=short matches CI flag.
+if command -v pytest &> /dev/null || python -c "import pytest" &> /dev/null; then
+    echo "[pre-push] -> pytest --tb=short"
+    python -m pytest --tb=short
+else
+    echo "[pre-push] WARNING: pytest not found. Install: pip install pytest"
+    echo "[pre-push] Skipping tests."
+fi
+
+# 3. gdlint (mirrors CI lint-gdscript) — optional, skip if not installed
+if command -v gdlint &> /dev/null; then
+    echo "[pre-push] -> gdlint ."
+    gdlint .
+else
+    echo "[pre-push] (gdlint not installed; skipping GDScript lint — install: pip install gdtoolkit)"
+fi
+
+echo "[pre-push] All checks passed."

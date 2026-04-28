@@ -3,7 +3,6 @@ import re
 from pathlib import Path
 
 import pytest
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = REPO_ROOT / "agents"
@@ -19,11 +18,22 @@ def _agent_files():
 
 
 def _parse_frontmatter(path: Path):
+    """Parse a flat scalar `key: value` YAML frontmatter block.
+
+    Intentionally minimal — agent frontmatter is always 3 string fields.
+    Avoids a PyYAML dependency that CI doesn't install.
+    """
     text = path.read_text(encoding="utf-8")
     match = FRONTMATTER_RE.match(text)
     if not match:
         return None
-    return yaml.safe_load(match.group(1))
+    fields = {}
+    for line in match.group(1).splitlines():
+        if not line.strip() or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        fields[key.strip()] = value.strip()
+    return fields
 
 
 def test_agents_dir_not_empty():
@@ -34,7 +44,7 @@ def test_agents_dir_not_empty():
 def test_agent_frontmatter_parses(path):
     fm = _parse_frontmatter(path)
     assert isinstance(fm, dict), (
-        f"{path.name}: missing or invalid YAML frontmatter block (expected leading '---' block)"
+        f"{path.name}: missing or invalid frontmatter block (expected leading '---' block)"
     )
 
 
