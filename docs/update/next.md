@@ -17,12 +17,7 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Added
 
-- New `gdd-auditor` subagent — independent reviewer that audits the draft GDD against a 9-category checklist (state/lifecycle, failure recovery, win/loss specifics, onboarding, balance numbers, feedback gaps, mechanic interactions, asset scope, skipped sections) and returns 5-8 follow-up questions per round.
-
 ## Changed
-
-- `game-planner` skill now runs **two fixed audit rounds** after synthesizing the GDD draft (Rounds 6-7) before showing it to the user. Each audit batch-asks 5-8 questions to fill blind spots that single-pass interviews leak. Pattern follows GSD's Generator-Verifier loop with fresh-context audit rather than self-critique.
-- Wiki (EN + zh) updated to document the new `gdd-auditor` agent and the two-pass audit loop in `game-planner` — `core-skills.md` and `codebase-guide.md` (new `agents/` section enumerating all 5 sub-agents).
 
 ## Fixed
 
