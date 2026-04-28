@@ -50,6 +50,18 @@ A small subsystem for recording what happened during a session. Hooks call `reco
 
 For details on writing hooks and using the metrics API, see [Writing a hook](writing-a-hook.md).
 
+### Permission contract layers
+
+Role permissions are expressed in three places. They overlap on purpose, but each layer has a distinct job — when you change one, check whether the others need to follow:
+
+| Layer | What it controls | Source of truth |
+|-------|------------------|-----------------|
+| `config/stage_schemas.json` | Did the role finish? Which output files must exist before the next role can start. | Read by `stage_reminder.py` (validate completion) and `check_stage_prerequisites.py` (gate worker dispatch). |
+| `hooks/check_file_permissions.py` | What can the role write right now? Per-role write-scope whitelist enforced on every Write/Edit tool call. | Authoritative for runtime permissions. Schemas do **not** define write scope. |
+| `skills/core/gm-*/SKILL.md` "Permission" section | Human-readable mirror of the hook rule for the role's owner. | Should match the hook; if they drift, the hook wins at runtime — but a contributor reading the skill will be misled. |
+
+A common mistake is reading `stage_schemas.json` as if it were the full write contract. It is not — it only lists output files for the completion gate. Adding a file to a role's schema does **not** grant write permission; you also have to extend the hook's allow-list.
+
 ---
 
 ## agents/

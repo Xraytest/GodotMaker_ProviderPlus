@@ -41,7 +41,7 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 
 ## `/gm-asset`
 
-**What it does:** Makes sure every art and audio file listed in `ASSETS.md` actually exists before the build starts.
+**What it does:** Makes sure every art and audio file listed in `ASSETS.md` actually exists, and generates one visual reference image per scene described in `SCENES.md`, before the build starts.
 
 **When to run it:** After `/gm-gdd`, before `/gm-build`.
 
@@ -49,9 +49,10 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 - Reads `ASSETS.md` to find every asset the game needs
 - For assets you have already provided: dispatches an Analyst helper to inspect your image files and record what they contain
 - For assets that are missing: generates them via an image generation API (Gemini or xAI, depending on your configuration)
+- For each entry in `SCENES.md`: generates a target reference image at `references/scene_<name>.png` from the scene description, art direction, and your provided art style
 - Updates `ASSETS.md` with the actual file paths
 
-**What you get:** Art files in `assets/` and a fully resolved `ASSETS.md` ready for the build step.
+**What you get:** Art files in `assets/`, scene reference images in `references/`, and a fully resolved `ASSETS.md` ready for the build step. The scene references become the visual contract that `/gm-evaluate` later compares running screenshots against.
 
 **Things to know:** You can re-run `/gm-asset` at any milestone if you add new assets to `ASSETS.md` or replace image files. It will only process what has changed.
 

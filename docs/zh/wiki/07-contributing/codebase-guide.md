@@ -50,6 +50,18 @@ Hook 注册关系（哪个脚本响应哪个事件）存储在 `config/settings.
 
 关于编写 hook 和使用 metrics API 的详细说明，请参阅 [编写 Hook](writing-a-hook.md)。
 
+### 权限契约的三层划分
+
+角色权限分布在三处，刻意有重叠，但每一层职责不同 — 改动其中一层时，要检查其他层是否要跟着动：
+
+| 层 | 控制什么 | 真值来源 |
+|----|---------|---------|
+| `config/stage_schemas.json` | 角色完成了没？下一个角色启动前必须存在的产出文件清单。 | 由 `stage_reminder.py`（完成校验）和 `check_stage_prerequisites.py`（worker 派发前置检查）读取。 |
+| `hooks/check_file_permissions.py` | 当前角色现在能写什么？每次 Write/Edit 工具调用都强制执行的 per-role 写权限白名单。 | 运行时权限的最终判定；schema 不定义写权限。 |
+| `skills/core/gm-*/SKILL.md` 的 "Permission" 段落 | 给该角色的执行者读的人类版镜像。 | 应当与 hook 一致；若漂移，运行时以 hook 为准 — 但读 SKILL 的贡献者会被误导。 |
+
+一个常见误解是把 `stage_schemas.json` 当成完整的写权限契约。它**不是** — 它只列出完成校验所需的产出文件。给某个角色的 schema 加文件**不会**自动获得写权限，还得同时扩展 hook 的白名单。
+
 ---
 
 ## agents/
