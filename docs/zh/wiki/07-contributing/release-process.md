@@ -10,11 +10,11 @@ GodotMaker 使用语义版本控制。每次发版遵循一份简短的清单；
 
 | 级别 | 场景 | 示例 |
 |-------|------|---------|
-| PATCH | 不改变行为的 bug 修复 | `0.4.0 → 0.4.1` |
-| MINOR | 新功能或行为变更（向后兼容） | `0.4.0 → 0.5.0` |
+| PATCH | 向后兼容的 bug 修复（无新行为） | `0.4.0 → 0.4.1` |
+| MINOR | 向后兼容的新功能或行为变更 | `0.4.0 → 0.5.0` |
 | MAJOR | 破坏性变更，无法通过增量迁移解决 | `0.x → 1.0.0` |
 
-`publish.py` 在 PATCH 升级时自动继续，在 MINOR 升级时弹出确认提示，在 MAJOR 升级时要求 `--force`。
+`publish.py` 在 PATCH 升级时自动继续，在 MINOR 升级时弹出确认提示，在 MAJOR 升级时要求 `--force`。`migrations/` 下的迁移脚本（按时间戳命名，与版本号解耦）会在任何非 MAJOR 升级时执行——完整策略见 [`../../versioning.md`](../../versioning.md)。
 
 ---
 
@@ -64,7 +64,7 @@ GodotMaker 使用语义版本控制。每次发版遵循一份简短的清单；
 
 4. **升级 VERSION。** 将新版本号写入仓库根目录的 `VERSION` 文件。这是唯一的真实来源。
 
-5. **添加迁移脚本**（仅限 MINOR）。如果任何变更需要更新现有游戏项目的文件，在 `migrations/{old}_to_{new}/` 下添加迁移脚本。脚本有编号，由 `tools/migrate.py` 按序执行。脚本格式见 `migrations/README.md`。
+5. **添加迁移脚本**（如有需要）。如果任何变更需要在现有游戏项目里改写文件，用 `python tools/migrate.py --new <slug>` 创建——会生成 `migrations/<utc-时间戳>_<slug>.py`。bump 级别不限制迁移，**PATCH 和 MINOR 都适用**。脚本格式与 applied-tracking 机制见 `migrations/README.md`。
 
 6. **提交并打标签。**
 
@@ -84,13 +84,13 @@ GodotMaker 使用语义版本控制。每次发版遵循一份简短的清单；
 
 ## 迁移脚本
 
-每个 MINOR 版本可能附带迁移脚本，自动修复现有游戏项目中的兼容性问题。脚本存放在 `migrations/{old}_to_{new}/` 下，例如：
+发版时可以附带迁移脚本，自动修复现有游戏项目中的兼容性问题。脚本直接放在 `migrations/` 下，按 UTC 时间戳命名：
 
 ```
-migrations/0.3_to_0.4/001_track_hooks.py
-migrations/0.3_to_0.4/002_track_stage_schemas.py
+migrations/20260429100000_fix_state_path.py
+migrations/20260430153000_rename_metrics_field.py
 ```
 
-当 `publish.py` 检测到 MINOR 升级时，`tools/migrate.py` 会按字母序依次运行这些脚本。某个脚本失败时，迁移链中止，publish 以错误退出。此时目标项目可能处于部分迁移状态——修复问题后重新运行 publish 即可继续，或者使用 `--force` 进行干净安装。
+`tools/migrate.py` 读取每个目标项目的 `.godotmaker/applied_migrations.json`，按时间序应用差集。某个脚本失败时迁移链中止，publish 以错误退出；已成功的脚本仍保留在 `applied_migrations.json` 里，重新运行 publish 时从断点继续。
 
-在 MAJOR 版本发布时，上一个 MAJOR 版本的所有迁移脚本都会被删除，不会延续——MAJOR 升级改用 `--force` 进行干净的重新初始化。
+MAJOR 升级完全跳过迁移，改用 `--force` 干净重装；迁移追踪器会被重置并在重新部署后重新建立 baseline。时间戳序列本身是单调全局的——旧脚本作为历史记录留在磁盘上，新装项目或 MAJOR 重装时会被 baseline 为已应用。

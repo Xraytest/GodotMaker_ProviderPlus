@@ -32,12 +32,12 @@ Contributors: every pull request must add an entry to `next.md` under the approp
 
 ## Migration scripts
 
-When a MINOR version upgrade includes breaking changes, a migration script handles the transition automatically. Migration scripts live under `migrations/` in the GodotMaker repository, organised by version pair (e.g., `migrations/0.1_to_0.2/`). `tools/publish.py` discovers and runs them in sorted order during an upgrade.
+When an upgrade requires rewriting files in an existing target project, a migration script handles the transition automatically. Migration scripts live under `migrations/` in the GodotMaker repository, named by UTC timestamp (e.g., `migrations/20260429100000_fix_state_path.py`). Each target project tracks which scripts it has applied in `.godotmaker/applied_migrations.json`; on every upgrade `tools/publish.py` applies the diff in chronological order. The mechanism is decoupled from the product's MAJOR.MINOR.PATCH version — any non-MAJOR upgrade may carry migrations. (MAJOR upgrades skip migrations and use `--force` clean re-init, then re-baseline.)
 
 You can also run migrations manually for testing:
 
 ```bash
-python tools/migrate.py /path/to/my-game --from 0.1.0 --to 0.2.0
+python tools/migrate.py /path/to/my-game
 ```
 
 For the full upgrade and downgrade policy, including what happens at MAJOR version boundaries, see [`../../versioning.md`](../../versioning.md).

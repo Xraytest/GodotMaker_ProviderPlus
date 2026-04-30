@@ -127,7 +127,7 @@ git checkout v0.1.0          # in the GodotMaker repo
 python tools/publish.py --force /path/to/my-game
 ```
 
-The `--force` flag skips the upgrade prompts and does a clean re-initialisation of the framework files in your project.
+The `--force` flag does a few things at once: it skips MINOR/MAJOR upgrade prompts, allows downgrades, and overwrites `.claude/settings.json`. The full clean re-initialisation (wiping `.claude/skills/`, `.godotmaker/hooks/`, runtime state files, etc.) only happens on **MAJOR** upgrades — on PATCH/MINOR/SAME the existing framework files are simply overwritten in place. So in the downgrade example above, `--force` mainly serves to override the downgrade block.
 
 ### The pipeline references "stages" but I only see `/gm-*` commands. What gives?
 

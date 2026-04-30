@@ -10,11 +10,11 @@ For version scheme details and how `publish.py` handles upgrades in target proje
 
 | Level | When | Example |
 |-------|------|---------|
-| PATCH | Bug fixes with no behaviour change | `0.4.0 → 0.4.1` |
-| MINOR | New features or behaviour changes (backward-compatible) | `0.4.0 → 0.5.0` |
+| PATCH | Backward-compatible bug fixes (no new behaviour) | `0.4.0 → 0.4.1` |
+| MINOR | Backward-compatible new features or behaviour changes | `0.4.0 → 0.5.0` |
 | MAJOR | Breaking changes; incremental migration not possible | `0.x → 1.0.0` |
 
-`publish.py` auto-proceeds on PATCH, prompts for confirmation on MINOR, and requires `--force` on MAJOR.
+`publish.py` auto-proceeds on PATCH, prompts for confirmation on MINOR, and requires `--force` on MAJOR. Migration scripts under `migrations/` (timestamped, decoupled from version) are applied on any non-MAJOR upgrade — see [`../../versioning.md`](../../versioning.md) for the full policy.
 
 ---
 
@@ -64,7 +64,7 @@ High-level checklist. Follow the canonical steps in `docs/contributing/release-c
 
 4. **Bump VERSION.** Write the new version number to the `VERSION` file at the repo root. This is the single source of truth.
 
-5. **Add migration scripts** (MINOR only). If any change requires updating an existing game project's files, add a migration script under `migrations/{old}_to_{new}/`. Scripts are numbered and run in sorted order by `tools/migrate.py`. See `migrations/README.md` for the script format.
+5. **Add migration scripts** (if needed). If any change requires rewriting files inside an existing game project, scaffold a migration with `python tools/migrate.py --new <slug>` — this writes `migrations/<utc-timestamp>_<slug>.py`. The bump level does not gate migrations; PATCH and MINOR alike. See `migrations/README.md` for the script format and the applied-tracking model.
 
 6. **Commit and tag.**
 
@@ -84,13 +84,13 @@ High-level checklist. Follow the canonical steps in `docs/contributing/release-c
 
 ## Migrations
 
-Each MINOR release may ship migration scripts that automatically fix compatibility issues in existing game projects. Scripts live under `migrations/{old}_to_{new}/`, for example:
+Releases may ship migration scripts that automatically fix compatibility issues in existing game projects. Scripts live directly under `migrations/`, named by UTC timestamp:
 
 ```
-migrations/0.3_to_0.4/001_track_hooks.py
-migrations/0.3_to_0.4/002_track_stage_schemas.py
+migrations/20260429100000_fix_state_path.py
+migrations/20260430153000_rename_metrics_field.py
 ```
 
-`tools/migrate.py` runs them in sorted order when `publish.py` detects a MINOR upgrade. If a script fails, the chain aborts and publish exits with an error. The target project may be partially migrated at that point — fix the issue and re-run publish to continue, or use `--force` for a clean install.
+`tools/migrate.py` reads each target's `.godotmaker/applied_migrations.json` and applies the diff in chronological order. If a script fails, the chain aborts and publish exits with an error; already-successful scripts keep their entries in `applied_migrations.json`, so a re-run picks up where it left off.
 
-At MAJOR release time, all migration scripts from the previous MAJOR version are deleted. They are not carried forward — MAJOR upgrades use `--force` for a clean re-initialization instead.
+MAJOR upgrades skip migrations entirely and use `--force` for clean re-initialisation; the migration tracker is reset and re-baselined after re-deploy. The timestamp series is monotonic and global — old scripts stay on disk as historical record and are baselined as already-applied for any fresh install or post-MAJOR re-init.

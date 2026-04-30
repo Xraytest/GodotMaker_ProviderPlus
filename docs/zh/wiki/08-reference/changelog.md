@@ -32,12 +32,12 @@
 
 ## 迁移脚本
 
-当 MINOR 版本升级包含破坏性变更时，迁移脚本会自动处理过渡。迁移脚本存放在 GodotMaker 仓库的 `migrations/` 目录下，按版本对组织（如 `migrations/0.1_to_0.2/`）。`tools/publish.py` 在升级时按排序顺序发现并运行这些脚本。
+当升级需要在现有目标项目里改写文件时，迁移脚本会自动处理过渡。迁移脚本存放在 GodotMaker 仓库的 `migrations/` 目录下，按 UTC 时间戳命名（如 `migrations/20260429100000_fix_state_path.py`）。每个目标项目在 `.godotmaker/applied_migrations.json` 里追踪已应用过哪些；每次升级时 `tools/publish.py` 按时间序应用差集。整套机制与产品 MAJOR.MINOR.PATCH 完全解耦——任何非 MAJOR 升级都可以携带迁移。（MAJOR 升级跳过迁移，改用 `--force` 干净重装后重新 baseline。）
 
 你也可以单独运行迁移脚本用于测试：
 
 ```bash
-python tools/migrate.py /path/to/my-game --from 0.1.0 --to 0.2.0
+python tools/migrate.py /path/to/my-game
 ```
 
 完整的升级和降级策略，包括 MAJOR 版本边界的处理，见 [`../../versioning.md`](../../versioning.md)。

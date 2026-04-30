@@ -42,11 +42,17 @@ Run the same command again inside an already-published project. GodotMaker compa
 
 | Upgrade type | What happens |
 |--------------|--------------|
-| **Patch** (e.g. 0.3.0 to 0.3.1) | Proceeds automatically — just bug fixes, nothing to review |
-| **Minor** (e.g. 0.3.0 to 0.4.0) | Shows the changelog for the new version, asks you to confirm, then runs any migration scripts |
-| **Major** (e.g. 0.x to 1.x) | Requires `--force` — breaking changes that need a clean re-initialization |
-| **Same version** | Always proceeds — useful when you've made local changes to the framework |
-| **Downgrade** | Blocked by default; requires `--force` to override |
+| **Patch** (e.g. 0.3.0 to 0.3.1) | Proceeds automatically — backward-compatible bug fixes. Applies any pending migrations |
+| **Minor** (e.g. 0.3.0 to 0.4.0) | Shows the changelog, asks you to confirm. Applies any pending migrations |
+| **Major** (e.g. 0.x to 1.x) | Requires `--force` — breaking changes that need a clean re-initialization. Skips migrations and re-baselines after re-deploy |
+| **Same version** | Always proceeds — useful when you've made local changes to the framework. Also applies any pending migrations you added locally without bumping `VERSION` |
+| **Downgrade** | Blocked by default; requires `--force` to override. Migrations are not rolled back (no down-migrations); restore from VCS if needed |
+
+> Migrations and bump levels are independent. Each migration is a
+> timestamped script under `migrations/`; targets record what they've
+> applied in `.godotmaker/applied_migrations.json`. PATCH and MINOR both
+> apply any pending scripts. See [`../../versioning.md`](../../versioning.md)
+> for the full policy.
 
 For the full upgrade policy and migration script details, see [`../../versioning.md`](../../versioning.md). For what changed in each release, see the [changelog](../08-reference/changelog.md).
 

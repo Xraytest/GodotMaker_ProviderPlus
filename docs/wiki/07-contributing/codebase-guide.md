@@ -141,7 +141,7 @@ Python CLI scripts that contributors and users run directly.
 | `check_env.py` | Verify Godot, Python, API keys are set up correctly |
 | `check_project.py` | Validate a generated project for missing files and broken paths |
 | `asset_gen.py` | Generate art via Gemini / xAI (called by `/gm-asset`, can run standalone) |
-| `migrate.py` | Run version migration scripts when upgrading across MINOR releases |
+| `migrate.py` | Apply pending migrations to a target on any non-MAJOR upgrade; also scaffolds new ones via `--new <slug>` |
 
 ### How publish.py wires everything together
 
@@ -233,4 +233,4 @@ Thin wrappers for the two operations that contributors run from a terminal:
 
 ## migrations/
 
-Migration scripts run by `tools/migrate.py` when upgrading a target project across MINOR releases. Scripts are stored under `migrations/{old}_to_{new}/` and run in sorted order. MAJOR upgrades clear all migration scripts (they are not carried forward). See [Release process](release-process.md) for the full upgrade flow.
+Migration scripts run by `tools/migrate.py` on any non-MAJOR upgrade. Scripts are stored directly under `migrations/`, named by UTC timestamp (`<YYYYMMDDhhmmss>_<slug>.py`), and applied in chronological order. Each target tracks which IDs it has applied in `.godotmaker/applied_migrations.json`; the system is decoupled from the product's MAJOR.MINOR.PATCH version. MAJOR upgrades skip migrations entirely and use `--force` clean re-init, after which `baseline_applied()` re-marks every current migration as applied. See [Release process](release-process.md) for the full upgrade flow.

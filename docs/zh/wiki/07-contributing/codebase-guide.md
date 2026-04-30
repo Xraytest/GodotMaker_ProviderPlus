@@ -141,7 +141,7 @@ manifest 的 schema、添加/移除流程和调试技巧见 `docs/contributing/s
 | `check_env.py` | 验证 Godot、Python 和 API key 是否正确配置 |
 | `check_project.py` | 检验已生成项目中的缺失文件和损坏路径 |
 | `asset_gen.py` | 通过 Gemini / xAI 生成美术资源（由 `/gm-asset` 调用，也可独立运行） |
-| `migrate.py` | 跨 MINOR 版本升级时运行版本迁移脚本 |
+| `migrate.py` | 在任何非 MAJOR 升级时把未应用的迁移脚本应用到目标项目；也通过 `--new <slug>` 生成新脚本模板 |
 
 ### publish.py 如何串联一切
 
@@ -233,4 +233,4 @@ tests/
 
 ## migrations/
 
-当目标项目跨 MINOR 版本升级时，`tools/migrate.py` 运行的迁移脚本。脚本存储在 `migrations/{old}_to_{new}/` 下，按字母序依次执行。MAJOR 升级时，所有来自上一个 MAJOR 版本的迁移脚本都会被删除，不会延续——MAJOR 升级改用 `--force` 进行干净的重新初始化。完整升级流程见 [发版流程](release-process.md)。
+`tools/migrate.py` 在任何非 MAJOR 升级时运行的迁移脚本。脚本直接放在 `migrations/` 下，按 UTC 时间戳命名（`<YYYYMMDDhhmmss>_<slug>.py`），按时间序执行。每个目标项目在 `.godotmaker/applied_migrations.json` 里独立追踪已应用的 ID；整套机制与产品 MAJOR.MINOR.PATCH 完全解耦。MAJOR 升级完全跳过迁移、改用 `--force` 干净重装，重装后 `baseline_applied()` 会把所有当前迁移重新标记为已应用。完整升级流程见 [发版流程](release-process.md)。

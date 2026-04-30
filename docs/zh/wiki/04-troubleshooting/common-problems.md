@@ -293,7 +293,7 @@ python tools/publish.py --force <target>
 
 ### 迁移脚本在中途失败了
 
-**症状：** 某个迁移脚本打印了报错并在 `MINOR` 升级流程中途停下来了。
+**症状：** 某个迁移脚本打印了报错并在任何非 MAJOR 的 publish（PATCH / MINOR / SAME 版本重新发布）执行 pending 迁移时中途停下来了。
 
 **解决办法：** 看报错信息，修复根本原因（通常是文件缺失或路径不对），然后重新跑：
 
@@ -301,4 +301,39 @@ python tools/publish.py --force <target>
 python tools/migrate.py <target>
 ```
 
-迁移脚本设计上支持重复执行——已完成的步骤会自动跳过。如果不确定哪一步失败了，运行 `python tools/check_project.py <target>` 查看必要文件的当前状态。
+迁移脚本设计上支持重复执行——已完成的步骤会被记录在 `.godotmaker/applied_migrations.json` 里，下次重跑会自动跳过。如果不确定哪一步失败了，运行 `python tools/check_project.py <target>` 查看必要文件的当前状态。
+
+---
+
+### `applied_migrations.json` 损坏了
+
+**症状：** publish 或 `migrate.py` 抛出 `TrackerCorruptionError: ... cannot parse JSON` 或 `... missing required field` 或 `... source must be one of ...`。
+
+**解决办法：** applied-tracker 文件（`<target>/.godotmaker/applied_migrations.json`）无法解析或 schema 不对。三种恢复方式：
+
+1. **从版本控制恢复**（如果用户主动追踪了它）：`git checkout <target>/.godotmaker/applied_migrations.json`。注意 GodotMaker 默认的 `.gitignore` 排除了这个文件，只有用户主动覆盖才会进 VCS。
+2. **从当前状态重新开始追踪**：`python tools/migrate.py <target> --baseline`。把当前所有 `migrations/<YYYYMMDDhhmmss>_<slug>.py` 标记为已应用、不实际执行——适合"实际项目状态已经是最新格式"的情况。
+3. **删除该文件**：`rm <target>/.godotmaker/applied_migrations.json`。下次 publish 会把它当作 legacy target——具体行为见下面的 `LegacyTargetWithMigrationsError` 条目。
+
+系统在此处显式报错（而不是静默把 tracker 视为空），是因为静默回退会导致下次 publish 重跑全部历史迁移——可能破坏项目状态。
+
+---
+
+### `LegacyTargetWithMigrationsError`
+
+**症状：** publish 或 `migrate.py` 抛出 `LegacyTargetWithMigrationsError: ... has .godotmaker/version ... but no applied_migrations.json, AND there are N migration script(s) on disk.`（`publish.py` 退出码 3。）
+
+**为什么会发生：** 你的目标项目是用 pre-tracking 版本的 GodotMaker 部署的（所以有 `.godotmaker/version` 但没有 `applied_migrations.json`），而你升级到的 GodotMaker 版本带了迁移脚本。我们无法安全地猜测这些脚本是否已经在目标项目的老状态中被应用过——任意一种静默猜测都可能破坏项目（要么跳过必要的清理工作，要么重跑已经应用过的迁移）。
+
+**解决办法：** 按照项目的实际情况选择恢复方案：
+
+1. **项目已经处于最新格式**（例如你一直在手动同步、或者这是一个新克隆的仓库）：`python tools/migrate.py <target> --baseline`。把所有当前迁移标记为已应用、不实际执行，然后重新 publish。
+2. **项目确实在这些迁移之前的状态，你想让它们真正执行**：手动创建一个空 tracker，这样 publish 会把它当作"新建 tracker"的正常升级处理。请使用下面的跨平台 Python 写法——`echo '{"applied": []}' > file` 在 bash 下没问题，但在 **Windows PowerShell 5.1** 下会写出带 BOM 的 UTF-16 LE 文件，下次 publish 会以 `TrackerCorruptionError` 拒绝。
+   ```bash
+   python -c "open(r'<target>/.godotmaker/applied_migrations.json', 'w', encoding='utf-8').write('{\"applied\": []}')"
+   ```
+   然后重新 publish——迁移会走正常的 pending-application 路径。
+
+> 为什么没有 `--force` 恢复方案？`publish.py --force` 的全量 cleanup 循环只在 MAJOR 升级时触发。对于 PATCH/MINOR/SAME，`--force` 仍然会调用 `run_migrations()`，仍然会再次抛 `LegacyTargetWithMigrationsError`。请使用上面的方案 1 或 2。
+
+这个错误是有意为之，不是 bug——之前的行为是静默 auto-baseline `legacy + migrations` 这种情况，可能在没有任何信号的情况下跳过必要的清理工作。
