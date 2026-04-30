@@ -42,8 +42,10 @@ Does this PR change behavior, move files, rename config keys, or break existing 
 - [ ] **No** — no migration needed
 - [ ] **Yes** — migration script added to `migrations/` ([guide](migrations/README.md))
 
-> If "Yes": add a script to `migrations/{current}_to_{next}/NNN_description.py`.
-> The script must define `migrate(target: Path) -> None` and be idempotent.
+> If "Yes": run `python tools/migrate.py --new <slug>` to scaffold
+> `migrations/<utc-timestamp>_<slug>.py`. The script must define
+> `migrate(target: Path) -> None` and be idempotent. The bump level does
+> NOT gate migrations — PATCH releases can ship them too.
 
 ## Checklist
 

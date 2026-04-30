@@ -14,17 +14,40 @@ Steps to follow when publishing a new version of GodotMaker.
    cp next.template.md next.md
    ```
 
-2. **Check migration scripts** (MINOR bumps only)
-   - If this release changes behavior or file locations, ensure migration
-     scripts exist in `migrations/{old}_to_{new}/`
+2. **Check migration scripts** (any bump level — applied tracking is decoupled from the version)
+   - If this release rewrites files inside existing target projects (moved
+     paths, renamed config keys, hook fix-ups, etc.), scaffold a migration:
+     ```bash
+     python tools/migrate.py --new <slug>
+     # writes migrations/<utc-timestamp>_<slug>.py
+     ```
    - Test migrations against a real target project:
      ```bash
-     python tools/migrate.py /path/to/test-project --from X.Y.0 --to X.Z.0
+     python tools/migrate.py /path/to/test-project
      ```
-   - See `migrations/README.md` for script format
-   - **MAJOR bump only:** delete all migration directories from the previous
-     MAJOR version (e.g., remove all `0.x_to_0.y/` dirs when releasing 1.0).
-     MAJOR upgrades use `--force` full rebuild, not incremental migration.
+   - See `migrations/README.md` for script format and the applied-tracking model
+   - **MAJOR bump:** old migration scripts are NOT deleted at release time.
+     The timestamp series is monotonic and global; existing scripts stay on
+     disk as historical record. MAJOR upgrades use `--force` full rebuild,
+     and `baseline_applied()` re-marks every current migration as applied
+     after re-deploy.
+   - **Recommended — release that introduces applied-tracking machinery.**
+     The release that *first* ships the applied-tracking subsystem (see
+     `migrations/README.md` Transition note) should ship with `migrations/`
+     **empty**. That way legacy targets reach the bootstrap branch and
+     emerge as "tracked, zero applied", and the next release that ships
+     V files just goes through the normal pending path. **This is the
+     preferred path.** If V files do ship in the same release as the
+     machinery, legacy users will hit `LegacyTargetWithMigrationsError`
+     on first contact and have to pick a recovery path manually
+     (`--baseline` if their project is already on the latest format,
+     or manually creating an empty tracker if the V files actually need
+     to run) — supported but a worse user experience than the
+     empty-migrations rollout. (Note: `publish --force` is NOT a
+     recovery option for non-MAJOR upgrades; the cleanup loop only
+     runs on MAJOR.) Once
+     applied-tracking is in any released version, this guidance no
+     longer applies — drop it from your release notes for that release.
 
 3. **Update version numbers**
    - `pyproject.toml` — update `version = "X.Y.Z"`

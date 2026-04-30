@@ -8,9 +8,44 @@ GodotMaker uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 | Level | Meaning | Example | Upgrade behavior |
 |-------|---------|---------|------------------|
-| **PATCH** | Bug fixes, no functionality change | `0.3.0 → 0.3.1` | Auto-proceed, informational message |
-| **MINOR** | New features or behavior changes | `0.3.0 → 0.4.0` | Show changelog, require confirmation |
-| **MAJOR** | Breaking changes, may need migration | `0.x → 1.x` | Strong warning, require confirmation |
+| **PATCH** | Backward-compatible bug fixes, no new behavior | `0.3.0 → 0.3.1` | Auto-proceed; applies any pending migrations |
+| **MINOR** | Backward-compatible new features or behavior changes | `0.3.0 → 0.4.0` | Show changelog, require confirmation; applies any pending migrations |
+| **MAJOR** | Breaking changes (incompatible) | `0.x → 1.x` | Strong warning; requires `--force` clean re-init (skips migrations, baselines instead) |
+
+### What "backward-compatible" means in this project
+
+GodotMaker is a framework that deploys files into a target project, not a library
+with a public API. So the compatibility contract has two specific clauses:
+
+- **User-saved files keep their format.** `CLAUDE.md`, `.claude/godotmaker.yaml`,
+  `.godotmaker/config.yaml`, and the user's own game code/scenes/assets are never
+  rewritten silently. Their schema/format from the previous version must still parse.
+- **Runtime state stays readable.** State files written by old hooks/skills
+  (`state.json` fields, `metrics*.jsonl` schema, `stage.jsonl`, `current_role`,
+  etc.) must still be readable by the new version — either directly, or via a
+  migration script that rewrites them on upgrade.
+
+Framework-managed files (skills, hooks, agents, templates, tools) are overwritten
+on every publish, so changes to *those* never count as "breaking" — they are
+simply re-deployed.
+
+### Choosing a bump level
+
+A short decision tree for contributors:
+
+1. Old projects work after re-publish, no user-saved file or runtime state
+   touched (or the change is a pure bug fix) → **PATCH**.
+2. New skill / hook / behavior added; old projects' user-saved files and
+   runtime state still parse and work → **MINOR**.
+3. Some user-saved file format or runtime state field changed in a way the
+   previous version's data cannot satisfy → **MAJOR**.
+
+**Migrations are independent of the bump level.** A migration is a tool for
+fixing or rewriting something in an existing target project; whether you need
+one is a separate question from which level to bump. The migration system
+itself is timestamp-driven (`migrations/<YYYYMMDDhhmmss>_<slug>.py`) and
+tracked per target in `.godotmaker/applied_migrations.json`; the product
+`VERSION` is not consulted. See "Version Migrations" below.
 
 ## Where Versions Live
 
@@ -43,32 +78,53 @@ The publish script compares the source `VERSION` against the target's
 
 | Level | Behavior |
 |-------|----------|
-| **PATCH** | Proceeds automatically. No migrations. |
-| **MINOR** | Shows changelog, asks confirmation, then runs migration scripts. |
+| **PATCH** | Proceeds automatically. Applies pending migrations (if any). |
+| **MINOR** | Shows changelog, asks confirmation. Applies pending migrations (if any). |
 | **MAJOR** | Blocks incremental migration. Requires `--force` for clean re-init. |
 
 ### Version Migrations
 
-MINOR upgrades may include migration scripts that automatically fix
-compatibility issues in the target project. Migrations live in
-`migrations/{old}_to_{new}/` and run in sorted order.
+Migrations are timestamped scripts under `migrations/`, e.g.:
 
-Example: upgrading from 0.2.0 → 0.4.0 runs:
 ```
-migrations/0.2_to_0.3/001_xxx.py
-migrations/0.2_to_0.3/002_yyy.py
-migrations/0.3_to_0.4/001_track_hooks.py
-migrations/0.3_to_0.4/002_track_stage_schemas.py
+migrations/20260429100000_fix_state_path.py
+migrations/20260430153000_rename_metrics_field.py
 ```
 
-If a migration fails, the chain aborts and publish exits with an error.
-The target project may be in a partially migrated state — fix the issue
-and re-run publish, or use `--force` for a clean install.
+Each target project records which migration IDs it has applied in
+`.godotmaker/applied_migrations.json`. On every publish, `migrate.py`
+discovers all scripts on disk, subtracts the ones already recorded as
+applied, and runs the rest in chronological order.
 
-Migrations can also be run standalone for testing:
+The system is **decoupled from MAJOR.MINOR.PATCH**. The product version
+is not consulted when picking which migrations to run — the only inputs
+are "what's on disk" and "what's already applied". This means PATCH
+releases can ship migrations as a first-class case (e.g., a hook bug
+that left orphan files in old projects gets a fix-up migration in the
+PATCH that fixes the hook).
+
+Fresh installs and MAJOR `--force` re-inits **baseline** instead: every
+current migration is marked as applied without being executed, since the
+target starts at the latest format and has nothing to migrate from.
+
+If a migration fails, the chain aborts immediately. Already-successful
+scripts keep their entries in `applied_migrations.json`, so re-running
+publish picks up exactly where it left off.
+
+Migrations can also be applied standalone (without re-publishing):
 ```bash
-python tools/migrate.py /path/to/my-game --from 0.3.0 --to 0.4.0
+python tools/migrate.py /path/to/my-game
 ```
+
+To scaffold a new migration:
+```bash
+python tools/migrate.py --new fix-state-path
+# Creates migrations/<current-utc-timestamp>_fix_state_path.py
+```
+
+Full details — naming convention, scripting rules, the legacy-target
+bootstrap rules (empty `migrations/` → empty tracker; non-empty →
+`LegacyTargetWithMigrationsError`) — live in `migrations/README.md`.
 
 ### MAJOR Upgrades
 
@@ -80,14 +136,17 @@ Full rebuild cleans all framework-managed content:
 - `.claude/skills/`, `.claude/agents/`, `.claude/config/`, `.claude/templates/`
 - `.godotmaker/hooks/`, `.godotmaker/stage_schemas.json`
 - `.godotmaker/state.json`, `.godotmaker/metrics*.jsonl`
+- `.godotmaker/applied_migrations.json` (re-baselined after re-deploy)
 - `tools/`
 - `.claude/settings.json` (force-overwritten)
 
 Preserved (user configuration):
 - `CLAUDE.md`, `.claude/godotmaker.yaml`, `.godotmaker/config.yaml`
 
-All migration scripts from the previous MAJOR version are deleted
-at release time — they are not carried forward.
+After re-deploy, `publish.py` calls `baseline_applied()` to mark every
+current migration as applied without running it — same as a fresh install.
+The migration timestamp series itself is monotonic and global; old
+scripts stay on disk as historical record.
 
 ### Downgrade
 
@@ -96,6 +155,15 @@ Downgrading (e.g., `0.4.0 → 0.3.0`) is blocked by default. Use `--force` to ov
 ```bash
 python tools/publish.py --force /path/to/my-game
 ```
+
+A forced downgrade still calls `run_migrations()` for routing consistency,
+but in practice the call is a no-op: `applied_migrations.json` already
+records every migration applied at the higher version, and the older
+release ships with a subset of those scripts on disk, so `pending = disk
+- applied` is empty. Migrations are not "rolled back" — that would
+require explicit down-migration scripts, which this system does not
+ship. If you need to roll back a schema change, restore the target
+project from a VCS snapshot.
 
 ### Re-publish Same Version
 
@@ -112,17 +180,19 @@ active role skill (and the user) know which framework version is deployed.
 ## Workflow for Releasing a New Version
 
 1. Make your changes in the GodotMaker repo
-2. If your changes require migration (MINOR bump), add a migration script
-   to `migrations/{old}_to_{new}/` — see `migrations/README.md` for details
-3. Update `CHANGELOG.md` — add a new `## [X.Y.Z]` section at the top
-4. Update `VERSION` — change to the new version number
-5. Commit and (optionally) tag:
+2. Decide the bump level using the decision tree above (PATCH / MINOR / MAJOR)
+3. If your changes require rewriting something in an existing target project,
+   scaffold a migration with `python tools/migrate.py --new <slug>` — see
+   `migrations/README.md` for details. This applies to any bump level.
+4. Update `CHANGELOG.md` — add a new `## [X.Y.Z]` section at the top
+5. Update `VERSION` — change to the new version number
+6. Commit and (optionally) tag:
    ```bash
    git add VERSION CHANGELOG.md migrations/
    git commit -m "release: vX.Y.Z"
    git tag vX.Y.Z
    ```
-6. Publish to target projects:
+7. Publish to target projects:
    ```bash
    python tools/publish.py /path/to/my-game
    ```
