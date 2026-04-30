@@ -21,7 +21,12 @@ from pathlib import Path
 from typing import NamedTuple
 
 from _version import SemVer, parse_version
-from migrate import run_migrations
+from migrate import (
+    LegacyTargetWithMigrationsError,
+    TrackerCorruptionError,
+    baseline_applied,
+    run_migrations,
+)
 
 
 class VersionCheckResult(NamedTuple):
@@ -112,11 +117,11 @@ def check_version_upgrade(repo_root: Path, target: Path, force: bool
     elif source_ver.minor != target_ver.minor:
         level = "MINOR"
         color = ">>  "
-        msg = "New features / behavior changes. Review changelog below."
+        msg = "Backward-compatible new features / behavior changes. Review changelog below."
     else:
         level = "PATCH"
         color = "    "
-        msg = "Bug fixes only, no functionality change."
+        msg = "Backward-compatible bug fixes."
 
     print(f"\n  {color}Upgrade: v{target_ver} -> v{source_ver} ({level})")
     print(f"  {color}{msg}")
@@ -152,6 +157,33 @@ def check_version_upgrade(repo_root: Path, target: Path, force: bool
             return VersionCheckResult(False, level, target_ver, source_ver)
 
     return VersionCheckResult(True, level, target_ver, source_ver)
+
+
+def select_migration_action(level: str, force: bool) -> str:
+    """Decide whether publish should baseline or run migrations.
+
+    Returns "baseline" or "run".
+
+    - FRESH (no `.godotmaker/version`) and MAJOR `--force` (cleanup wiped
+      state) start at the latest format and have nothing to migrate from
+      → "baseline" (mark every current migration as applied without
+      executing it).
+    - All other resolved upgrade levels — SAME, PATCH, MINOR, DOWNGRADE
+      with `--force` — already have a tracked state → "run" (apply
+      pending migrations). A legacy target lacking the tracker file is
+      handled inside `run_migrations()`: empty `migrations/` →
+      bootstrap an empty tracker; non-empty → raise
+      `LegacyTargetWithMigrationsError` and force the user to choose a
+      recovery path.
+
+    MAJOR without `--force` is filtered out by check_version_upgrade()
+    before this function is called, so the (level="MAJOR", force=False)
+    case is unreachable in practice; if it does arrive (defensive),
+    treating it as "run" is harmless because publish would have aborted.
+    """
+    if level == "FRESH" or (level == "MAJOR" and force):
+        return "baseline"
+    return "run"
 
 
 def copy_tree(src: Path, dst: Path):
@@ -473,6 +505,7 @@ def ensure_gitignore(target: Path):
         ".godotmaker/metrics.jsonl",
         ".godotmaker/metrics_current.jsonl",
         ".godotmaker/traces/",
+        ".godotmaker/applied_migrations.json",
     ]
 
     # If upgrading from old blanket ignore, remove it
@@ -554,6 +587,7 @@ def main():
             target / ".godotmaker" / "metrics.jsonl",
             target / ".godotmaker" / "metrics_current.jsonl",
             target / ".godotmaker" / "stage_schemas.json",
+            target / ".godotmaker" / "applied_migrations.json",
         ]:
             if f.exists():
                 f.unlink()
@@ -596,9 +630,36 @@ def main():
     # Initialize git repo with initial commit (required for worktree isolation)
     ensure_git_repo(target)
 
-    # Run version migrations (MINOR upgrades only — MAJOR uses clean re-init)
-    if level == "MINOR" and target_ver and source_ver:
-        if not run_migrations(target, target_ver, source_ver):
+    # Migration handling — per-target applied tracking
+    # (.godotmaker/applied_migrations.json), decoupled from the bump level.
+    # select_migration_action() decides between two paths:
+    #   "baseline" — skip execution, mark all current migrations as applied
+    #     (FRESH / MAJOR --force: target starts at the latest format and
+    #     has nothing to migrate from).
+    #   "run" — apply any pending migrations
+    #     (SAME / PATCH / MINOR / DOWNGRADE: target has tracked state.
+    #     Legacy targets without applied_migrations.json are bootstrapped
+    #     to an empty tracker if migrations/ is empty, or rejected with
+    #     LegacyTargetWithMigrationsError if it isn't — handled inside
+    #     run_migrations() itself.)
+    action = select_migration_action(level, args.force)
+    if action == "baseline":
+        n = baseline_applied(target)
+        if n:
+            scope = "fresh install" if level == "FRESH" else "MAJOR re-init"
+            print(f"Baselined {n} migration(s) for {scope}.")
+    else:
+        try:
+            ok = run_migrations(target)
+        except TrackerCorruptionError as e:
+            print(f"\nERROR: applied-migrations tracker is corrupt:\n  {e}",
+                  file=sys.stderr)
+            sys.exit(2)
+        except LegacyTargetWithMigrationsError as e:
+            print(f"\nERROR: legacy target needs explicit handling:\n  {e}",
+                  file=sys.stderr)
+            sys.exit(3)
+        if not ok:
             print("\nMigration failed. Published files are updated but migrations incomplete.")
             print("Fix the issue and re-run publish, or use --force for clean install.")
             sys.exit(1)
