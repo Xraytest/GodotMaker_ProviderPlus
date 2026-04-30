@@ -81,6 +81,138 @@ class TestWorkerBlocked:
         assert not is_blocked(parsed), "Worker should be allowed to write test files"
 
 
+class TestDecomposerSubagent:
+    """Decomposer subagent owns planning docs — must be exempt from the worker block."""
+
+    # Full decomposer-owned set: PLANNING_DOCS minus gap.md (which belongs to
+    # /gm-fixgap's lead, not decomposer) plus project.godot.
+    _DECOMPOSER_OWNED_FILES = [
+        "PLAN.md", "STRUCTURE.md", "ASSETS.md", "SCENES.md", "TOC.md",
+        "project.godot",
+    ]
+
+    @pytest.mark.parametrize("doc", _DECOMPOSER_OWNED_FILES)
+    def test_allow_owned_files_via_payload_agent_type(self, doc):
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": doc},
+            "agent_id": "decomposer-1",
+            "agent_type": "decomposer",
+        })
+        assert not is_blocked(parsed), (
+            f"Decomposer should be allowed to write {doc}"
+        )
+
+    @pytest.mark.parametrize("doc", _DECOMPOSER_OWNED_FILES)
+    def test_other_subagent_type_blocked_from_owned_files(self, doc):
+        """Worker subagent must NOT inherit decomposer's privileges on any
+        of the owned files (planning docs + project.godot)."""
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": doc},
+            "agent_id": "worker-1",
+            "agent_type": "worker",
+        })
+        assert is_blocked(parsed), (
+            f"Non-decomposer subagent must be blocked from {doc}"
+        )
+
+    def test_allow_via_metrics_lookup_when_payload_missing_agent_type(self, project_dir):
+        """Real-world PreToolUse may not carry agent_type — _lookup_agent_type
+        must recover it from metrics_current.jsonl."""
+        os.makedirs(".godotmaker", exist_ok=True)
+        with open(".godotmaker/metrics_current.jsonl", "w", encoding="utf-8") as f:
+            f.write('{"ts":"2026-04-30T00:00:00Z","event":"subagent_start",'
+                    '"agent_id":"decomposer-2","agent_type":"decomposer"}\n')
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "PLAN.md"},
+            "agent_id": "decomposer-2",
+            # NO agent_type in payload — must be recovered from metrics
+        })
+        assert not is_blocked(parsed), (
+            "Decomposer recovered via metrics lookup should be allowed"
+        )
+
+    def test_subagent_blocked_from_writing_metrics_file(self, project_dir):
+        """The metrics-fallback only stays trustworthy if subagents can't
+        forge entries. Writes to .godotmaker/metrics_current.jsonl must
+        always be denied for any subagent (even decomposer)."""
+        for agent_type in ("worker", "decomposer"):
+            _, _, parsed = run_hook(HOOK, {
+                "tool_name": "Write",
+                "tool_input": {"file_path": ".godotmaker/metrics_current.jsonl"},
+                "agent_id": f"{agent_type}-x",
+                "agent_type": agent_type,
+            })
+            assert is_blocked(parsed), (
+                f"{agent_type} subagent must NOT be able to write the metrics "
+                "log — that's the trust root for agent_type lookup"
+            )
+
+
+class TestIdentityResolution:
+    """Lock the current payload-vs-metrics identity-resolution behavior.
+
+    Current rule: `agent_type = data.get("agent_type", "") or _lookup_agent_type(agent_id)`.
+    Payload wins when present; metrics is consulted only when payload is empty.
+    These tests document and freeze that priority — if the resolution rule
+    changes (e.g., to require both to agree), update these tests deliberately."""
+
+    def test_payload_decomposer_metrics_worker_allows(self, project_dir):
+        """When payload says decomposer and metrics says worker, the payload
+        wins (current behavior). Subagents cannot forge their own payload
+        agent_type — Claude Code constructs it — so this is safe in practice."""
+        os.makedirs(".godotmaker", exist_ok=True)
+        with open(".godotmaker/metrics_current.jsonl", "w", encoding="utf-8") as f:
+            f.write('{"ts":"2026-04-30T00:00:00Z","event":"subagent_start",'
+                    '"agent_id":"agent-mismatch-1","agent_type":"worker"}\n')
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "PLAN.md"},
+            "agent_id": "agent-mismatch-1",
+            "agent_type": "decomposer",
+        })
+        assert not is_blocked(parsed), (
+            "Payload agent_type wins over metrics — decomposer payload allows."
+        )
+
+    def test_payload_worker_metrics_decomposer_blocks(self, project_dir):
+        """Inverse: when payload says worker and metrics says decomposer,
+        payload still wins, so the write is BLOCKED. This pins the
+        priority — if we ever flip to 'metrics wins', this test must change."""
+        os.makedirs(".godotmaker", exist_ok=True)
+        with open(".godotmaker/metrics_current.jsonl", "w", encoding="utf-8") as f:
+            f.write('{"ts":"2026-04-30T00:00:00Z","event":"subagent_start",'
+                    '"agent_id":"agent-mismatch-2","agent_type":"decomposer"}\n')
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "PLAN.md"},
+            "agent_id": "agent-mismatch-2",
+            "agent_type": "worker",
+        })
+        assert is_blocked(parsed), (
+            "Payload agent_type wins over metrics — worker payload blocks."
+        )
+
+    def test_payload_empty_metrics_worker_blocks(self, project_dir):
+        """Empty payload triggers metrics lookup. If lookup says worker,
+        the write must be blocked."""
+        os.makedirs(".godotmaker", exist_ok=True)
+        with open(".godotmaker/metrics_current.jsonl", "w", encoding="utf-8") as f:
+            f.write('{"ts":"2026-04-30T00:00:00Z","event":"subagent_start",'
+                    '"agent_id":"worker-via-lookup","agent_type":"worker"}\n')
+        _, _, parsed = run_hook(HOOK, {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "PLAN.md"},
+            "agent_id": "worker-via-lookup",
+            # NO agent_type in payload — lookup resolves to worker
+        })
+        assert is_blocked(parsed), (
+            "Lookup-resolved worker identity must block planning-doc writes."
+        )
+
+
 class TestEdgeCases:
     """Edge cases and non-file-write tools."""
 

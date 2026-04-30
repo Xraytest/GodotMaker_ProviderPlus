@@ -14,10 +14,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from metrics import record_event, EventType, get_current_role, WORKER_DISPATCH_ROLES
 
 GAME_CODE_EXTENSIONS = {".gd", ".tscn", ".tres"}
-PLANNING_DOCS = {"plan.md", "structure.md", "assets.md", "gap.md"}
+# Project-root planning artifacts — subagents may NOT modify these unless
+# their agent_type is in PLANNING_WRITER_AGENT_TYPES. Includes the four
+# 1b decomposer outputs (PLAN/STRUCTURE/ASSETS + SCENES/TOC) and GAP.md
+# (owned by /gm-fixgap's lead, not subagents).
+PLANNING_DOCS = {"plan.md", "structure.md", "assets.md", "gap.md",
+                 "scenes.md", "toc.md"}
+# project.godot is the engine config and changes the whole game. Subagents
+# may not edit it unless their agent_type is in PLANNING_WRITER_AGENT_TYPES.
+PROJECT_GODOT = "project.godot"
 E2E_DIR_PREFIX = "e2e/"
 ASSETS_DIR_PREFIX = "assets/"
 GODOTMAKER_DIR = ".godotmaker/"
+# Subagent types whose entire purpose is writing planning docs — exempt
+# from the general subagent block on PLANNING_DOCS and PROJECT_GODOT.
+PLANNING_WRITER_AGENT_TYPES = {"decomposer"}
 # Per-role narrow write allow-lists under .godotmaker/. Both roles still need
 # current_role + stage.jsonl for bookkeeping; evaluate also writes its verdict.
 EVAL_ALLOWED_GM_FILES = {".godotmaker/evaluation.json",
@@ -108,22 +119,70 @@ def _check_main(role: str, path_lower: str, file_name: str, ext: str) -> None:
                    f"({file_name}).", file_name)
 
 
-def _check_subagent(path_lower: str, file_name: str, agent_id: str) -> None:
+def _lookup_agent_type(agent_id: str) -> str:
+    """Find the agent_type recorded at SubagentStart for this agent_id.
+
+    Falls back to scanning metrics_current.jsonl when the PreToolUse payload
+    doesn't carry agent_type directly.
+    """
+    if not agent_id:
+        return ""
+    try:
+        from metrics import read_current_events
+        for evt in reversed(list(read_current_events())):
+            if (evt.get("event") == "subagent_start"
+                    and evt.get("agent_id") == agent_id
+                    and evt.get("agent_type")):
+                return evt["agent_type"]
+    except Exception:
+        pass
+    return ""
+
+
+def _check_subagent(path_lower: str, file_name: str, agent_id: str,
+                    agent_type: str) -> None:
     """Apply subagent rules. Calls _block on violation."""
     if _is_e2e_path(path_lower):
         _block(f"Workers cannot write to e2e/ ({file_name}). "
                "E2E tests are owned by the Evaluator.", file_name, agent_id)
+    if _is_godotmaker_path(path_lower):
+        # Subagents must not write under .godotmaker/ — that's hook trust
+        # ground (metrics_current.jsonl, current_role, stage.jsonl,
+        # evaluation.json). Without this rule, a worker could forge a
+        # subagent_start event with agent_type=decomposer and bypass the
+        # PLANNING_DOCS gate via the metrics-fallback lookup below.
+        _block(f"Workers cannot write to .godotmaker/ ({file_name}). "
+               "Pipeline state files are managed by the lead skill, "
+               "not subagents.", file_name, agent_id)
     if file_name in PLANNING_DOCS:
+        if agent_type in PLANNING_WRITER_AGENT_TYPES:
+            return  # Decomposer's whole job is writing these — allow.
         _block(f"Workers cannot modify planning documents ({file_name}). "
                "Report changes in your Report Notes section.", file_name, agent_id)
+    if file_name == PROJECT_GODOT:
+        if agent_type in PLANNING_WRITER_AGENT_TYPES:
+            return  # Decomposer may tweak engine config during 1b.
+        _block("Workers cannot modify project.godot. Engine config is "
+               "owned by the gdd / scaffold roles or the decomposer subagent.",
+               file_name, agent_id)
 
 
 def _check_legacy(is_subagent: bool, path_lower: str, file_name: str,
-                  ext: str, agent_id: str) -> None:
+                  ext: str, agent_id: str, agent_type: str) -> None:
     """Fallback rules when no current_role is set."""
     if is_subagent:
+        if _is_godotmaker_path(path_lower):
+            _block(f"Workers cannot write to .godotmaker/ ({file_name}).",
+                   file_name, agent_id)
         if file_name in PLANNING_DOCS:
+            if agent_type in PLANNING_WRITER_AGENT_TYPES:
+                return
             _block(f"Workers cannot modify planning documents ({file_name}).",
+                   file_name, agent_id)
+        if file_name == PROJECT_GODOT:
+            if agent_type in PLANNING_WRITER_AGENT_TYPES:
+                return
+            _block("Workers cannot modify project.godot.",
                    file_name, agent_id)
     else:
         if ext in GAME_CODE_EXTENSIONS:
@@ -152,6 +211,7 @@ def main():
 
     agent_id = data.get("agent_id", "")
     is_subagent = bool(agent_id)
+    agent_type = data.get("agent_type", "") or _lookup_agent_type(agent_id)
 
     record_event(
         EventType.FILE_WRITE if tool_name == "Write" else EventType.FILE_EDIT,
@@ -163,9 +223,9 @@ def main():
     role = get_current_role()
 
     if not role:
-        _check_legacy(is_subagent, path_lower, file_name, ext, agent_id)
+        _check_legacy(is_subagent, path_lower, file_name, ext, agent_id, agent_type)
     elif is_subagent:
-        _check_subagent(path_lower, file_name, agent_id)
+        _check_subagent(path_lower, file_name, agent_id, agent_type)
     else:
         _check_main(role, path_lower, file_name, ext)
 

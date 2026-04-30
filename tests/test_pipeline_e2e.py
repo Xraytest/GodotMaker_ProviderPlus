@@ -131,7 +131,7 @@ class TestGDDPhase:
         assert is_blocked(parsed)
 
     def test_gdd_completion_succeeds_with_files(self, project_dir):
-        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
+        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md", "ASSETS.md", "SCENES.md", "TOC.md"]:
             open(f, "w").close()
         code, parsed = run_hook("stage_reminder.py",
                                 write_stage_payload({"gdd": "2026-01-01T01:00:00Z"}))
@@ -179,7 +179,7 @@ class TestAssetPhase:
 class TestBuildPhase:
     def gdd_complete(self):
         scaffold_done()
-        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
+        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md", "ASSETS.md", "SCENES.md", "TOC.md"]:
             open(f, "w").close()
         write_completed_roles({"gdd": "2026-01-01T01:00:00Z"})
 
@@ -408,7 +408,7 @@ class TestFullLifecycleHappyPath:
         # GDD
         write_completed_roles({"scaffold": "t0"})
         write_current_role("gdd")
-        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md"]:
+        for f in ["GDD.md", "PLAN.md", "STRUCTURE.md", "ASSETS.md", "SCENES.md", "TOC.md"]:
             open(f, "w").close()
         _, parsed = run_hook("stage_reminder.py",
                              write_stage_payload({"scaffold": "t0", "gdd": "t1"}))

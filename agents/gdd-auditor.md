@@ -74,8 +74,8 @@ Walk through these categories against the GDD. Flag a category only when the gap
 ```
 ## Audit: GDD draft, iteration {N}                      [REQUIRED]
 
-### GDD Content                                          [REQUIRED]
-{Inline content of the current GDD draft, or an absolute path to it}
+### GDD Path                                             [REQUIRED]
+{Absolute path to the current GDD draft. Read the file yourself rather than expecting inlined content.}
 
 ### Iteration                                            [REQUIRED]
 {1 = first audit on v1 GDD, 2 = second audit on v2 GDD}

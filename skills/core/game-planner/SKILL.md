@@ -156,8 +156,8 @@ Audit brief:
 ```
 ## Audit: GDD draft, iteration 1
 
-### GDD Content
-{inline GDD v1 content here}
+### GDD Path
+{absolute path to GDD.md}
 
 ### Iteration
 1
@@ -196,8 +196,8 @@ Audit brief:
 ```
 ## Audit: GDD draft, iteration 2
 
-### GDD Content
-{inline GDD v2 content here}
+### GDD Path
+{absolute path to GDD.md}
 
 ### Iteration
 2

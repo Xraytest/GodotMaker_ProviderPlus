@@ -107,4 +107,4 @@ def test_gdd_auditor_brief_format_documents_previously_asked():
         "Brief Format must list `Previously Asked` as a brief field"
     )
     assert "Iteration" in brief, "Brief Format must list `Iteration` as a brief field"
-    assert "GDD Content" in brief, "Brief Format must list `GDD Content` as a brief field"
+    assert "GDD Path" in brief, "Brief Format must list `GDD Path` as a brief field"
