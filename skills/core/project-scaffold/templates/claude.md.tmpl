@@ -15,8 +15,9 @@ ECS-native: components are data, systems are logic, entities are component bags.
 - `src/components/` — C_ prefix, extends Component, @export vars only
 - `src/systems/` — PascalCase + System suffix, extends System
 - `src/entities/` — extends Entity, define_components()
-- `src/world.gd` — World autoload, registers all systems
-- `scenes/` — .tscn scene files
+- `scenes/` — .tscn scene files; gameplay scene contains a World child
+  node wired via `ECS.world = $World` in the main script's `_ready()`
+  (autoloading World breaks gecs v7.1.0)
 - `test/` — gdUnit4 tests (TDD: test first, then implement)
 
 ### ECS Rules

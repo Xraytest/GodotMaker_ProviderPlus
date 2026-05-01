@@ -15,14 +15,6 @@ run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4")
 ```
 
-### [autoload]
-
-```ini
-World="*res://src/world.gd"
-```
-
-The `*` prefix means the autoload is enabled.
-
 ### [display]
 
 ```ini

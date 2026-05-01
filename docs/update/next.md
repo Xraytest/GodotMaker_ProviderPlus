@@ -32,8 +32,17 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - `publish.py --force` documented accurately — full clean re-init only
   happens on MAJOR upgrades; on PATCH/MINOR/SAME `--force` just skips
   prompts and overwrites `settings.json`.
+- gecs v7.1.0 World pattern documented as a scene-node
+  (`@onready var world: World = $World; ECS.world = world`) across
+  `project-scaffold/SKILL.md`, `templates/claude.md.tmpl`, and
+  `references/project_settings.md`; `src/world.gd` removed from the
+  scaffold directory tree.
 
 ## Fixed
+
+- `project-scaffold/templates/project.godot.tmpl` drops the
+  `World="*res://src/world.gd"` autoload (collides with gecs v7.1.0's
+  `class_name World`) and adds the missing `config_version=5` line.
 
 - `hooks/check_file_permissions.py` asset-role gate resolves the
   candidate path against cwd via `_is_project_root_assets_md` —

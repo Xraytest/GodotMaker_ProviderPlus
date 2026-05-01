@@ -61,8 +61,7 @@ Create the project root and all subdirectories:
 │   ├── components/          # C_ prefixed component scripts
 │   ├── systems/             # NameSystem scripts
 │   ├── entities/            # Entity scene definitions
-│   ├── ui/                  # UI scenes and scripts
-│   └── world.gd            # gecs World — system registration
+│   └── ui/                  # UI scenes and scripts
 ├── scenes/
 │   ├── main.tscn            # Entry point scene
 │   └── game_world.tscn      # Gameplay scene with camera
@@ -99,19 +98,27 @@ Remove any template comments (lines starting with `; TEMPLATE:`) from the output
 | `claude.md.tmpl` | `CLAUDE.md` | Fill game info + ECS reference |
 | `gitignore.tmpl` | `.gitignore` | Use as-is, no placeholders |
 | `main_scene.tmpl` | `scenes/main.tscn` | Swap root node type for perspective |
-| `world_scene.tmpl` | `scenes/game_world.tscn` | Swap node + camera types |
+| `world_scene.tmpl` | `scenes/game_world.tscn` | Swap node + camera types; gameplay scene gets a World child node added during `/gm-build` |
 | `test_example.tmpl` | `test/test_example.gd` | Replace `{{GameNamePascal}}` |
 | `component.tmpl` | `src/components/c_example.gd` | Example stub |
 | `system.tmpl` | `src/systems/example_system.gd` | Example stub |
 
-Write `src/world.gd` directly — too short for a template:
+### gecs World setup
 
-```gdscript
-extends World
+gecs v7.1.0 ships `class_name World` in `addons/gecs/ecs/world.gd`. The
+canonical scene-node pattern:
 
-## ECS World — register systems here.
-## See the gecs skill for World API details.
-```
+- Add a `Node` child to your gameplay scene with
+  `script = res://addons/gecs/ecs/world.gd`, named `World`, with
+  `system_nodes_root = NodePath("Systems")` and
+  `entity_nodes_root = NodePath("Entities")`.
+- The main scene script wires it up:
+  `@onready var world: World = $World` then `ECS.world = world` in `_ready()`.
+- Drive systems via `world.process(delta, "gameplay")` /
+  `world.process(delta, "physics")` from `_process` / `_physics_process`.
+
+Scaffold leaves the World node out — gameplay scene structure is filled in
+during `/gm-build`. See the gecs skill for the full World API.
 
 ### Game Plan ECS stubs
 
@@ -123,7 +130,8 @@ If the Game Plan includes an ECS Architecture section with components and system
 - **Systems**: for each planned system (e.g., `MovementSystem`), create a file in
   `src/systems/` based on `system.tmpl`. Fill the class name and `query()` with
   the required components.
-- **World**: register all planned systems in `src/world.gd`.
+- **World**: register systems by adding them as children of the gameplay
+  scene's `World` node — see "gecs World setup" above for the full pattern.
 
 ## Step 4 — Genre Adaptations
 
@@ -157,9 +165,16 @@ After all files are written, tell the user what to do next:
    (prompts for Godot executable path on first run), and creates
    `.godotmaker/config.yaml` with default project settings.
 
-2. **Install addons** — read `references/addons.md` for details:
+2. **Install addons** — pick the row matching your Godot version from
+   `.claude/config/addon_versions.json` (the source of truth for repo
+   + tag + install path), then clone each into the listed install path:
    - gecs -> `addons/gecs/`
-   - gdUnit4 -> `addons/gdUnit4/`
+   - gdunit4 -> `addons/gdunit4/`
+   - godot_e2e -> `addons/godot_e2e/`
+
+   `tools/check_project.py --e2e` and the gm-* skills expect those
+   exact lowercase paths. See `references/addons.md` for the
+   step-by-step clone commands.
 
 3. **Register godot-mcp** for runtime debugging:
    ```bash
