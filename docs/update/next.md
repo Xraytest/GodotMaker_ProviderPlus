@@ -24,6 +24,9 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Changed
 
+- `migrations/README.md` adds an explicit "merged migrations are
+  immutable" rule — edits to a shipped script only affect first-time
+  runners; correct mistakes by shipping a new patching migration.
 - Versioning policy aligned with standard SemVer — PATCH / MINOR / MAJOR
   now decided by backward-compatibility of user-saved files and runtime
   state, decoupled from whether a migration ships.

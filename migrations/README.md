@@ -79,6 +79,12 @@ def migrate(target: Path) -> None:
 
 Rules:
 
+- Once a migration is merged to `main`, treat it as **immutable**.
+  Editing the body of a shipped migration only affects users who run it
+  for the first time after your edit — anyone whose
+  `applied_migrations.json` already records that ID will never see the
+  fix. To correct a mistake, ship a **new** migration that patches
+  whatever the broken one left behind.
 - Scripts MUST be idempotent (safe to re-run if a previous run was
   interrupted before being recorded).
 - Scripts MUST NOT prompt for user input.
