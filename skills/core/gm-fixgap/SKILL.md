@@ -34,8 +34,9 @@ Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"r
 - Otherwise → proceed (fresh fixgap or repeat fixgap is both valid).
 
 Then read context:
-- `GAP.md` (if present) → existing fix progress; find tasks not yet `verified`. If missing, Step 1 will generate it from `evaluation.json`.
-- `.godotmaker/evaluation.json` → the source of truth for what to fix
+- `GAP.md` (if present) → existing fix progress; find tasks not yet `verified`. If missing, Step 1 will generate it from `evaluation.json` (and `verify_report.json`).
+- `.godotmaker/evaluation.json` → the source of truth for product-layer issues to fix
+- `.godotmaker/verify_report.json` → mechanical-layer failures from the most recent verify
 - `PLAN.md` → read-only; understand the existing work the fixes must integrate with
 - `STRUCTURE.md` → architecture (fixes need to respect existing system boundaries)
 - `MEMORY.md` index + sub-files → past decisions and known gotchas
@@ -46,7 +47,7 @@ Then read context:
 2. **You and your workers CANNOT write to e2e/ directory.** E2E tests are owned by the Evaluator.
 3. **Workers CANNOT modify GAP.md/PLAN.md/STRUCTURE.md/ASSETS.md.**
 4. **Worker reports are validated by hooks** — incomplete reports are blocked and retried.
-5. **Only fix what the evaluation identified.** Do not add features or refactor unrelated code.
+5. **Only fix what `evaluation.json` or a fresh `verify_report.json` identified.** Do not add features or refactor unrelated code.
 6. **MUST NOT self-certify completion.** Dispatch verifiers, then reviewers.
 
 ## Honest Reporting
@@ -78,22 +79,54 @@ Do NOT update PLAN.md task statuses — fixgap operates from `evaluation.json` g
 
 ## Build Cycle
 
-### Step 1 — Read Evaluation, Generate or Resume GAP.md
+### Step 1 — Read Evaluation (+ Verify Feedback), Generate or Resume GAP.md
 
-Read `.godotmaker/evaluation.json` and extract:
+GAP.md may need tasks from two sources:
+
+1. **`.godotmaker/evaluation.json`** — product-layer issues found by the evaluator. Always processed.
+2. **`.godotmaker/verify_report.json`** — mechanical-layer failures from the most recent verify pass. Processed only when fresh.
+
+#### 1a. Pull issues from `evaluation.json`
+
 - `critical_issues` — must fix all (→ task IDs `C1`, `C2`, …)
 - `major_issues` — fix as many as possible (→ task IDs `J1`, `J2`, …)
 - `gameplay_issues` — fix only if related to a critical/major (→ `G1`, `G2`, …)
 - `minor_issues` — skip unless trivial
 
+#### 1b. Pull failures from `verify_report.json`
+
+Run this sub-step only if `.godotmaker/verify_report.json` exists, `result == "fail"`, and its `ts` is later than the most recent `role == "fixgap"` event in `stage.jsonl` (or there is no prior fixgap event). Otherwise (file missing, `result == "pass"`, or stale `ts`) → skip 1b; GAP.md comes from 1a only.
+
+Translate failures into tasks using the existing `C` / `J` prefixes — verify-source tasks share the numbering pool with evaluation-source tasks. **Each task carries both a classification (C/J) and an execution mode** (worker / main-agent-direct / escalate-to-user); Step 3 follows the execution mode without re-classifying.
+
+**Project-code tasks** (`checks.<name>.result == "fail"`) — execution = **dispatch worker** (normal Worker → Verifier → Reviewer cycle):
+- `checks.build.errors[]` / `checks.unit_tests.failures[]` → **C** (compile/runtime failures block forward progress).
+- `checks.unit_tests` with `failed > 0` and empty `failures[]` → **C**, one task: "investigate test runner output".
+- `checks.static_check.issues[]` of `check == "missing_unit_test"` → **J** (gap, not a hard block).
+- Other `checks.static_check.issues[]` → **C** (project-completeness gate).
+- `checks.lint.issues[]`, `checks.lint.format_drift` → **J** (technical debt).
+- Unknown `static_check.issues[].check` discriminator → use the raw value verbatim, default **C**.
+
+**Config tasks** (`checks.<name>.result == "error"`, paired with `tooling_notes[]`):
+- Routable fallback WITH operand present (per the fallback table in `gm-verify/SKILL.md` Section B) → **J**, execution = **main-agent-direct** (apply the structured edit using the operand; Hard Rule 1 only restricts `.gd/.tscn/.tres`; mark `verified` after the next verify round confirms the crash is gone). NO worker dispatch.
+- `escalate`, OR routable with missing operand, OR unknown discriminator → **C**, execution = **escalate-to-user** (surface `tool` + `error` + `crashed_on` and any original `suggested_fallback` verbatim, halt the cycle, leave `pending` until the user resolves it). NO worker dispatch.
+
+Each task records its origin via a `Source: verify_report.json | evaluation.json` line in the task block (and `verify` / `evaluation` in the Task Status table). Numbering follows insertion order — existing rows keep their numbers, new rows get the next available number per letter. Execution priority dispatches verify-source before evaluation-source regardless of number.
+
+#### 1c. Write or merge GAP.md
+
 **If `GAP.md` does not exist:**
-Generate it from `.claude/templates/GAP.md` populated with the issues above.
-All tasks start as `pending`.
+Generate it from `.claude/templates/GAP.md`. Within each letter list verify-source tasks first (so they get the lower numbers), then evaluation-source. All tasks start as `pending`. Record both source timestamps in the header — `Source Evaluation: <evaluation iteration / ts>` and (when applicable) `Source Verify: <verify_report ts>`.
 
 **If `GAP.md` already exists:**
-- Compare its `Source Evaluation` header against the current `evaluation.json` timestamp/iteration.
-- If they match → resume from the existing GAP.md (skip already-`verified` tasks).
-- If they differ → archive the old GAP.md to `.godotmaker/gaps/<old-iteration>/GAP.md`, then generate a fresh one from the new evaluation.
+- `Source Evaluation` header differs from current `evaluation.json` → archive and generate a fresh one.
+- Header matches AND 1b applies → **append** new verify-source tasks as `pending` rows with the next available number per letter; existing rows keep their numbers and statuses. Update the `Source Verify` header to the new ts.
+- Header matches AND 1b does not apply → resume (skip already-`verified` tasks).
+
+**Backward compatibility (per-row).** Apply on each row independently — interrupted upgrades leave mixed-annotated state:
+- Row missing `Source:` line or `Source` column entry → treat as `evaluation`, fill when you next touch that row.
+- Row already annotated → leave its `Source:` as-is.
+- New verify-source rows always include both the `Source:` line and the column entry.
 
 ### Step 2 — Plan Fixes
 
@@ -104,9 +137,12 @@ For each non-`verified` task in GAP.md:
 
 ### Step 3 — Dispatch Workers
 
-- Read `references/worker-dispatch.md` for the brief template
+Worker-dispatch tasks only — Step 1b classified main-agent-direct and escalate-to-user tasks; handle those per their classification, not here.
+
+- Read `references/worker-dispatch.md` for the brief template.
+- Dispatch verify-source before evaluation-source within `pending`.
 - Use `subagent_type: "worker"`. Max 3 in parallel with disjoint file sets via `isolation: "worktree"`.
-- In each brief, paste the specific evaluation finding from GAP.md, the file(s) to modify, and the correct behavior from GDD.md.
+- In each brief, paste the specific finding from GAP.md, the file(s) to modify, and the correct behavior from GDD.md.
 - Update task status `pending` → `in_progress` when dispatched, `in_progress` → `completed` when worker reports DONE.
 
 ### Step 4 — Final Verify + Review (single pass after all fixes)

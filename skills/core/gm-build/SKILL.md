@@ -71,6 +71,27 @@ A `failed` task requires a new task or user escalation — do not retry in place
 
 Track a running count of workers completed since the last verification round.
 
+### Step 0 — Process Verify Feedback
+
+Run this step before Step 1 only if `.godotmaker/verify_report.json` exists, `result == "fail"`, and its `ts` is later than the most recent `role == "build"` event in `stage.jsonl` (or there is no prior build event). Otherwise → skip to Step 1.
+
+Translate failures into `pending` tasks at the bottom of `PLAN.md`.
+
+**Project-code tasks** (any `checks.<name>.result == "fail"`) — go through the normal Worker → Verifier → Reviewer cycle:
+
+- `checks.build.errors[]` → one task per distinct compile error (file + line + message in Notes).
+- `checks.unit_tests.failures[]` → one task per failing test. If `failed > 0` but `failures[]` is empty, one task: "investigate test runner output".
+- `checks.lint.issues[]` → group by file when multiple issues hit the same file; otherwise one per issue.
+- `checks.lint.format_drift` → one task: "run `<format_drift.command>` to format the drifted files (`<file_count>` files)".
+- `checks.static_check.issues[]` → one task per issue, using `check` as the title prefix (e.g. `missing_unit_test: s_player_input`). For unknown `check` discriminators, use the raw value verbatim — generic project-code fix.
+
+**Config tasks** (any `checks.<name>.result == "error"`, paired with one `tooling_notes[]` entry) — main agent applies directly, NO worker dispatch:
+
+- Routable fallback (`exclude_file` / `scope_narrow` / `add_gdlintrc_rule` / `skip_check`) WITH operand present (per the fallback table in `gm-verify/SKILL.md` Section B) → apply the structured edit using the note's operand. Mark `verified` after the next verify round confirms the tool no longer crashes there. Hard Rule 1 only restricts `.gd/.tscn/.tres`.
+- `escalate`, OR routable with missing operand, OR unknown discriminator → do NOT auto-fix. Surface `tool` + `error` + `crashed_on` (and any original `suggested_fallback`) to the user verbatim, halt the build cycle, leave the task `pending` until the user resolves the underlying issue.
+
+Do NOT delete project code as a "fix" for a tool crash.
+
 ### Step 1 — Dispatch Workers
 
 - Read `references/worker-dispatch.md` for the brief template

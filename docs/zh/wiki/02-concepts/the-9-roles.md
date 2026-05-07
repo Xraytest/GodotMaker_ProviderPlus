@@ -65,6 +65,7 @@
 **什么时候运行：** 在 `/gm-asset` 之后。当前里程碑必须已完成 `/gm-gdd`。
 
 **背后发生了什么：**
+- 恢复阶段：如果 `.godotmaker/verify_report.json` 中存在上一次 `/gm-verify` 留下的新鲜失败报告，把每个 check 的失败翻译成 `pending` 任务追加到 `PLAN.md`，再继续后续流程
 - 读取 `PLAN.md`，找出待处理的任务，从风险最高的开始
 - 派遣 Worker（执行者，最多同时 3 个）——每个 Worker 实现一个游戏系统及其单元测试，完成后汇报
 - 大约每 5 个 Worker 之后，派遣一个 Verifier（验证者）——无界面编译项目并运行单元测试
@@ -80,18 +81,20 @@
 
 ## `/gm-verify`
 
-**做什么：** 对整个项目做一次快速的机械检查——编译、单元测试、文件结构。
+**做什么：** 对整个项目做一次快速的机械检查——编译、单元测试、Lint、文件结构。
 
 **什么时候运行：** 在 `/gm-build` 之后，以及每次 `/gm-fixgap` 之后。
 
 **背后发生了什么：**
 - 无界面运行 Godot 构建，检查编译错误
 - 通过 `gdUnit4` 运行 `tests/` 里的所有单元测试
-- 检查当前里程碑 `stage_schemas.json` 中列出的每个文件是否都存在
+- 跑 `gdlint` 和 `gdformat --check` 做风格检查
+- 通过 `tools/check_project.py --all` 跑静态项目检查
+- 把结构化结论写入 `.godotmaker/verify_report.json`（每次都写，无论 PASS 还是 FAIL）
 
-**你得到什么：** 一份打印出来的验证报告，按检查项给出通过/失败判定，并附上所有失败的完整输出。全部通过后，`/gm-verify` 会向 `.godotmaker/stage.jsonl` 追加一个 `verify` 事件。
+**你得到什么：** 两份产出——一份给人看的对话内验证报告，以及 `.godotmaker/verify_report.json` 同等信息的结构化版本。全部通过时，`/gm-verify` 还会向 `.godotmaker/stage.jsonl` 追加一个 `verify` 事件。
 
-**需要知道的：** `/gm-verify` 是 `/gm-evaluate` 的前置条件。如果它失败了，说明构建还有问题需要修——回到 `/gm-build` 或者给 `/gm-fixgap` 提供问题描述。
+**需要知道的：** `verify_report.json` 是协议级别的反馈通道——下一步的 `/gm-build` 或 `/gm-fixgap` 读它,把失败翻译成待办任务,而不是盲目重试。每个 check 的 `result` 是 `pass | warn | fail | error` 四选一:`fail` = 项目代码有问题(修代码);`error` = 验证工具自身崩了,修法是改 lint/测试配置(`tooling_notes` 里给出),**不要删项目代码**。schema 和消费规则文档化在 `gm-verify/SKILL.md`。如果 `/gm-verify` 失败:构建阶段回 `/gm-build`,评估之后回 `/gm-fixgap`——两者都会自动读取这份报告。
 
 ---
 
@@ -121,7 +124,8 @@
 **什么时候运行：** 在 `/gm-evaluate` 拒绝构建之后。
 
 **背后发生了什么：**
-- 读取 `.godotmaker/evaluation.json` 和 `GAP.md`（按优先级排列的问题清单）
+- 读取 `.godotmaker/evaluation.json` 拿到产品层问题；恢复阶段如果 `.godotmaker/verify_report.json` 有上一轮 verify 留下的失败，也一并读入
+- 生成或合并 `GAP.md`——一个按优先级排列的任务清单：每个 `C`/`J`/`G` 字母分组内，verify 来源的机械层失败排在前面，evaluation 来源的产品层问题排在后面
 - 派 Worker 处理每个关键和重要问题，采用和 `/gm-build` 相同的 Worker → Verifier → Reviewer 循环
 - 将当前的 `GAP.md` 归档到 `.godotmaker/gaps/<n>/`，保留每次迭代的记录
 

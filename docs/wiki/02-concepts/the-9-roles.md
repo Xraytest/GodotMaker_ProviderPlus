@@ -65,6 +65,7 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 **When to run it:** After `/gm-asset`. Requires a completed `/gm-gdd` in the current milestone.
 
 **What happens behind the scenes:**
+- On resume, reads `.godotmaker/verify_report.json` if a fresh failure report exists from the previous `/gm-verify`, and translates each per-check failure into a `pending` task in `PLAN.md` before continuing
 - Reads `PLAN.md` to find pending tasks, starting with the riskiest ones
 - Dispatches Workers (up to 3 in parallel) — each Worker implements one game system and its unit tests, then reports back
 - After every 5 or so workers, dispatches a Verifier — a helper that compiles the project headlessly and runs the unit tests
@@ -87,11 +88,13 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 **What happens behind the scenes:**
 - Runs the Godot headless build to check for compile errors
 - Runs all unit tests in `tests/` via `gdUnit4`
-- Checks that every file listed in `stage_schemas.json` for the current milestone exists
+- Runs `gdlint` and `gdformat --check` for style
+- Runs the static project check via `tools/check_project.py --all`
+- Writes the structured verdict to `.godotmaker/verify_report.json` (every run, pass or fail)
 
-**What you get:** A printed verification report with a pass/fail verdict per check and the full output of any failures. On success, `/gm-verify` appends a `verify` event to `.godotmaker/stage.jsonl`.
+**What you get:** Two outputs — a chat-readable verification report you can scan, and `.godotmaker/verify_report.json` with the same information in a structured form. On success, `/gm-verify` also appends a `verify` event to `.godotmaker/stage.jsonl`.
 
-**Things to know:** `/gm-verify` is a prerequisite for `/gm-evaluate`. If it fails, the build still has problems that need fixing — go back to `/gm-build` or file an issue description for `/gm-fixgap`.
+**Things to know:** `verify_report.json` is the protocol-level feedback channel for the next role in the loop — `/gm-build` and `/gm-fixgap` read it to translate failures into pending tasks instead of retrying blindly. Each check's `result` is one of `pass | warn | fail | error`: `fail` = project code has problems (fix the code), `error` = the verification tool itself crashed and the fix is a config change documented in `tooling_notes` (don't delete project code). Schema and consumer rules live in `gm-verify/SKILL.md`. If `/gm-verify` fails, go back to `/gm-build` (mid-build) or `/gm-fixgap` (post-evaluation) — both pick up the report automatically. If `/gm-verify` fails, go back to `/gm-build` (if you were mid-build) or `/gm-fixgap` (if you were post-evaluation) — both will pick up the report automatically.
 
 ---
 
@@ -121,7 +124,8 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 **When to run it:** After `/gm-evaluate` rejects the build.
 
 **What happens behind the scenes:**
-- Reads `.godotmaker/evaluation.json` and `GAP.md` (a prioritised list of issues)
+- Reads `.godotmaker/evaluation.json` for product-layer issues and, on resume, `.godotmaker/verify_report.json` for any mechanical failures from the latest verify pass
+- Generates or merges `GAP.md` — a prioritised task list that lists verify-source mechanical fixes first, then evaluation-source product fixes, within shared `C` / `J` / `G` severity prefixes
 - Dispatches Workers to address each critical and major issue, with the same Worker → Verifier → Reviewer cycle as `/gm-build`
 - Archives the current `GAP.md` to `.godotmaker/gaps/<n>/` so every iteration is preserved
 

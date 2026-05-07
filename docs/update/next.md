@@ -17,6 +17,27 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Added
 
+- `.godotmaker/verify_report.json` — `/gm-verify` now writes a
+  structured report on every run (PASS or FAIL) with per-check
+  results plus `tooling_notes[]` for verification-tool crashes.
+  Each non-`escalate` `suggested_fallback` ships a required
+  structured operand (`crashed_on` / `narrowed_command` /
+  `rule_name` / `check_name`) so consumers can act
+  deterministically without parsing the free-text `error` field.
+  `/gm-build` and `/gm-fixgap` Resume Checks read the report and
+  translate failures into pending PLAN.md / GAP.md tasks, closing
+  the retry loop where verify failures had no machine-readable
+  channel driving the next iteration. Schema documented in
+  `gm-verify/SKILL.md`; declared as a protocol guarantee for
+  downstream consumers (see [v0.3.0 changelog](../../CHANGELOG.md)).
+- `tests/test_verify_report_fixtures.py` — golden fixtures + tiny
+  hand-rolled schema validator pinning the v1 **producer-side
+  schema invariants** (top-level required keys, per-check required
+  arrays, fallback-operand pairing, PASS↔`tooling_notes==[]`,
+  `warn` lint-only). 5 representative report shapes, 19 tests.
+  **Scope is intentionally producer-side and shape-only** —
+  consumer behavior in `gm-build` / `gm-fixgap` remains specified
+  in SKILL.md prose and is not executable-tested here.
 - `tools/publish.py` validates `godot_path` interactively before
   writing `.claude/godotmaker.yaml` — runs `<godot_path> --version`,
   re-prompts on empty / unverifiable input up to 5 times, and leaves
@@ -24,6 +45,19 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Changed
 
+- `config/stage_schemas.json` `verify` entry declares
+  `files: [".godotmaker/verify_report.json"]` so the existing
+  `stage_reminder.py` validator blocks the `verify` completion
+  event when the report is missing — same gate mechanism that
+  `evaluate` already used for `evaluation.json`.
+- `hooks/check_file_permissions.py` — `VERIFY_ALLOWED_GM_FILES`
+  adds `.godotmaker/verify_report.json` (the third write
+  exception alongside `current_role` and `stage.jsonl`).
+- `templates/GAP.md` — adds optional `Source Verify` header
+  section, per-task `Source:` line, and a `Source` column in the
+  Task Status table. Verify-source tasks share `C` / `J`
+  severity prefixes with evaluation-source tasks but list first
+  within each letter.
 - `migrations/README.md` adds an explicit "merged migrations are
   immutable" rule — edits to a shipped script only affect first-time
   runners; correct mistakes by shipping a new patching migration.
