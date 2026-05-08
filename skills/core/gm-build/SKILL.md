@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 $ARGUMENTS
 
-You are implementing a Godot game by dispatching Worker subagents. Risk tasks first, then main tasks — both surfaced from PLAN.md.
+You are implementing a Godot game by dispatching Worker subagents. Risk tasks first, then main tasks — both surfaced from PLAN.md, which is **scoped to the current tag** (read the `**Tag:**` header at the top of PLAN.md). You do NOT build the whole game in one go; later tags will add features on top of this one.
 
 ## Session Setup
 
@@ -22,16 +22,19 @@ You are implementing a Godot game by dispatching Worker subagents. Risk tasks fi
 Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`.
 
 - If `project.godot` does not exist → STOP. Tell user to run `/gm-scaffold` first.
+- If `ROADMAP.md` does not exist → STOP. Tell user to run `/gm-gdd` first.
 - If **no event with `role == "gdd"`** exists anywhere in the file → STOP. Tell user to run `/gm-gdd` first.
+- If `PLAN.md` is missing the `**Tag:**` header → STOP. Tell user the file is stale and to re-run `/gm-gdd` to regenerate it for the current tag.
 - If the **last event** has `role == "build"` AND all PLAN.md tasks are `verified` → STOP. Tell the user:
-  > "Build already completed for this milestone at {timestamp}. Recommended next: /gm-verify.
+  > "Build already completed for the current tag at {timestamp}. Recommended next: /gm-verify.
   > If you need to redo this step or have other plans, just tell me."
 - Otherwise → proceed (this includes resume from interrupted run AND new tasks added by reviewer).
 
 Then read context:
-- `PLAN.md` → find pending/in_progress/completed tasks (anything not `verified`)
-- `STRUCTURE.md` → architecture and build order
-- `MEMORY.md` index + sub-files → avoid repeating known mistakes
+- `PLAN.md` → current tag's `**Tag:**` header + Tag Mechanics + Inherited Mechanics + pending/in_progress/completed tasks (anything not `verified`)
+- `STRUCTURE.md` → architecture and build order (current tag scope: previous tags' systems already exist on disk and may be touched only when PLAN.md explicitly lists a refactor task for them)
+- `MEMORY.md` index + sub-files (cross-tag accumulating notebook) → avoid repeating known mistakes
+- `docs/tags/<prev_tag>/STRUCTURE.md` (only if PLAN.md has Inherited Mechanics or refactor tasks touching prior systems) → know what already exists before adding/refactoring
 
 ## Hard Rules
 
@@ -41,6 +44,7 @@ Then read context:
 4. **Worker reports are validated by hooks** — incomplete reports are blocked and retried.
 5. **MUST NOT skip stages.** Fix issues first; report to user after 3 attempts.
 6. **MUST NOT self-certify completion.** Dispatch verifiers, then reviewers.
+7. **Tag scope discipline.** Workers MAY touch files from previous tags **only if** PLAN.md has an explicit refactor / fix task naming those files. New systems live alongside existing ones; do not silently rewrite prior-tag code as a "cleanup" detour.
 
 ## Honest Reporting
 

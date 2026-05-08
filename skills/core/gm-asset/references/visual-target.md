@@ -44,4 +44,4 @@ For each scene, gather from the planning docs:
 
 `references/scene_{name}.png` — the file `gm-evaluate` will VQA-compare against the running game's screenshot of the same scene.
 
-If the user rejects a generated reference, regenerate with a tightened prompt. Reference images that ship into the milestone become the contract for what the implementation must visually match.
+If the user rejects a generated reference, regenerate with a tightened prompt. Reference images that ship into the tag become the contract for what the implementation must visually match.

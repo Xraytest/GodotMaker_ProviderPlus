@@ -1,11 +1,12 @@
 ---
 name: gm-asset
 description: |
-  Asset collection + generation. Reads ASSETS.md MISSING entries, dispatches
-  an analyst subagent for user-provided image inspection, calls
-  tools/asset_gen.py (Bash) for AI generation, updates ASSETS.md status.
-  Re-runnable any time during a milestone (user can add new art mid-development).
-  Explicit invocation only — use /gm-asset.
+  Asset collection + generation. Reads ASSETS.md MISSING entries (rows
+  whose Tag matches the current tag), dispatches an analyst subagent for
+  user-provided image inspection, calls tools/asset_gen.py (Bash) for AI
+  generation, updates ASSETS.md status. ASSETS.md is cross-tag — every
+  row carries a Tag column marking the introducing tag. Re-runnable any
+  time during a tag. Explicit invocation only — use /gm-asset.
 disable-model-invocation: true
 ---
 
@@ -13,9 +14,9 @@ disable-model-invocation: true
 
 $ARGUMENTS
 
-You are filling in the missing assets identified in `ASSETS.md`. Image analysis runs in an analyst subagent (context isolation for image binaries); AI generation is a direct Bash call to `tools/asset_gen.py` — no worker subagent needed.
+You are filling in the missing assets in `ASSETS.md` for the **current tag** (read the tag from `PLAN.md`'s `**Tag:**` header). `ASSETS.md` is a cross-tag accumulating manifest: every row has a `Tag` column marking the tag that introduced it. Process only rows whose `Tag` matches the current tag AND whose `Status` is `MISSING`. Previous tags' assets stay on disk and stay listed in `ASSETS.md` with their original `Tag` value — do not re-list, re-generate, or relabel them. Image analysis runs in an analyst subagent (context isolation for image binaries); AI generation is a direct Bash call to `tools/asset_gen.py` — no worker subagent needed.
 
-This skill is **per-milestone re-runnable**: a user can call `/gm-asset` between build batches when they add new art files. Each invocation processes whatever is currently `MISSING`.
+This skill is **per-tag re-runnable**: a user can call `/gm-asset` between build batches when they add new art files. Each invocation processes whatever is currently `MISSING` for the current tag.
 
 ## Session Setup
 
@@ -23,12 +24,14 @@ This skill is **per-milestone re-runnable**: a user can call `/gm-asset` between
 
 ## Resume Check
 
-Asset is re-runnable per milestone, so the gate is the current state of `ASSETS.md`, not events in `stage.jsonl`.
+Asset is re-runnable per tag, so the gate is the current state of `ASSETS.md`, not events in `stage.jsonl`.
 
 - If `project.godot` does not exist → STOP. Tell user to run `/gm-scaffold` first.
+- If `ROADMAP.md` does not exist → STOP. Tell user to run `/gm-gdd` first.
 - If `ASSETS.md` does not exist → STOP. Tell user to run `/gm-gdd` first.
-- Read `ASSETS.md` Asset Table. If no rows have status `MISSING` (all are `provided`/`generated`/`N/A`) → STOP. Tell the user:
-  > "No MISSING assets to process. Recommended next: /gm-build.
+- If `PLAN.md` is missing the `**Tag:**` header → STOP. Tell user the file is stale and to re-run `/gm-gdd` to regenerate it for the current tag.
+- Read `ASSETS.md` Asset Table. Filter rows where `Tag` matches the current tag. If no current-tag rows have status `MISSING` (all are `provided`/`generated`/`N/A`/`deferred`) → STOP. Tell the user:
+  > "No MISSING assets for the current tag. Recommended next: /gm-build.
   > If you've added new art files since last run, just tell me and I'll re-scan."
 - Otherwise → proceed.
 
@@ -39,18 +42,20 @@ Asset is re-runnable per milestone, so the gate is the current state of `ASSETS.
    - the analyst subagent (Step 2).
    You never write image files yourself. The hook boundary is your Write/Edit tool calls; Bash subprocesses fall outside it by design — this is the intended path for AI generation, not a loophole to abuse.
 2. **Image analysis MUST go through the analyst subagent.** Do NOT Read image binaries from `assets/` yourself — they pollute context. Dispatch analyst when you need style/dimension/role extraction.
-3. **You CANNOT modify PLAN.md, GAP.md, STRUCTURE.md, SCENES.md.** Asset work is isolated from gameplay planning. Code-art coupling issues surface in `/gm-evaluate` and are addressed in `/gm-fixgap` or the next milestone.
+3. **You CANNOT modify PLAN.md, GAP.md, STRUCTURE.md, SCENES.md.** Asset work is isolated from gameplay planning. Code-art coupling issues surface in `/gm-evaluate` and are addressed in `/gm-fixgap` or the next tag.
 4. **You CANNOT write game code.** Code lives in `/gm-build` workers.
 5. **Audio MUST be user-provided** — AI audio generation is not supported. Mark audio as deferred and remind the user.
 
 ## Process
 
-### Step 1 — Inventory MISSING
+### Step 1 — Inventory MISSING (current tag only)
 
-Read `ASSETS.md` Asset Table. Build a list of MISSING items grouped by type:
+Read `ASSETS.md` Asset Table. Filter to rows whose `Tag` matches the current tag. Among those, build a list of MISSING items grouped by type:
 - **Art (sprites, textures, references):** can be user-provided or AI-generated
 - **Audio:** must be user-provided
 - **Scene reference images:** AI-generated based on SCENES.md descriptions
+
+Do NOT touch rows from prior tags — even if they look broken, that's a `/gm-fixgap` concern. New rows you add for newly-discovered assets must carry the current tag in their `Tag` column.
 
 ### Step 2 — Collect User-Provided Files
 
@@ -92,7 +97,8 @@ After confirmation, run `python tools/asset_gen.py` once per asset (per `asset-p
 After all generation calls return:
 - Change generated rows from `MISSING` → `generated` with file path + generation params
 - Audio rows that user did not provide → mark `deferred` (with user acknowledgment)
-- Verify total MISSING count is zero (or all remaining are deferred audio with user OK)
+- Verify total MISSING count for the current tag is zero (or all remaining are deferred audio with user OK)
+- New rows added this tag must carry the current tag in their `Tag` column
 
 ## Plan Discipline
 
@@ -102,7 +108,9 @@ ASSETS.md is the only document you may modify. Status transitions are forward-on
 MISSING → provided | generated | N/A | deferred
 ```
 
-Never revert a `provided`/`generated` row back to `MISSING` — if the user wants to regenerate, treat it as a NEW row or note in MEMORY.md.
+Never revert a `provided`/`generated` row back to `MISSING` — if the user wants to regenerate, treat it as a NEW row (with the current tag in its `Tag` column) or note in MEMORY.md.
+
+**Tag scope:** Only modify rows whose `Tag` matches the current tag, and only add new rows tagged with the current tag. Prior tags' rows are immutable from this skill. If a prior-tag asset is broken, raise it as a fix task in `/gm-fixgap` — do not relabel the row's `Tag` column.
 
 ## Available Skills & Tools
 

@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 $ARGUMENTS
 
-You are presenting the completed game to the user for acceptance.
+You are presenting the **current tag's** completed work to the user for acceptance. This is a per-tag gate — accepting now does NOT mean the whole game is done; it means this tag (vX.Y.Z) is ready to be sealed, archived, and git-tagged by `/gm-finalize`. The user can choose to continue to the next tag (`/gm-gdd` again) or stop the project here.
 
 ## Session Setup
 
@@ -50,18 +50,19 @@ Do NOT capture new screenshots. Use the screenshots already captured by the Eval
 Format a clear summary:
 
 ```
-## Game Summary
+## Tag Summary — {Tag from PLAN.md}
 
 **Project:** {name}
-**Description:** {from GDD}
+**Tag delivers:** {one-liner from ROADMAP.md entry for this tag}
 
-### What Was Built
-- {N} systems, {M} components
-- {key features list}
+### What This Tag Built
+- {N} new systems, {M} new components added in this tag
+- Tag mechanics delivered: {Tag Mechanics list from PLAN.md, all PASS per evaluation.json `tag_mechanics`}
+- Inherited mechanics still passing: {list each `<prev>-MN: pass` from evaluation.json `inherited_mechanics`}
 
 ### Test Results
 - Unit tests: {from gm-verify results or PLAN.md}
-- E2E tests: {from evaluation.json e2e_tests}
+- E2E suite: {evaluation.json `e2e_tests.passed`/`e2e_tests.total` — single suite covering both this tag's mechanics and inherited mechanics}
 
 ### Evaluation Result: APPROVED
 - Mandatory checks: all passed
@@ -76,6 +77,11 @@ Format a clear summary:
 
 ### Screenshots
 {show evaluator screenshots side-by-side with references}
+
+### What's Next
+- After /gm-finalize this tag will be archived to docs/tags/{Tag}/ and `git tag {Tag}` will be created.
+- Remaining tags in ROADMAP.md: {list of unshipped tags}
+- To start the next tag, re-run /gm-gdd; to stop here, just don't.
 ```
 
 ### 4. Ask for Decision

@@ -37,7 +37,7 @@ Then read context:
 - `GAP.md` (if present) → existing fix progress; find tasks not yet `verified`. If missing, Step 1 will generate it from `evaluation.json` (and `verify_report.json`).
 - `.godotmaker/evaluation.json` → the source of truth for product-layer issues to fix
 - `.godotmaker/verify_report.json` → mechanical-layer failures from the most recent verify
-- `PLAN.md` → read-only; understand the existing work the fixes must integrate with
+- `PLAN.md` → read-only; current tag's `**Tag:**` header tells you which tag's gaps you're fixing. The same tag-scope discipline as gm-build applies: previous tags' code is touchable only when a GAP item explicitly names it.
 - `STRUCTURE.md` → architecture (fixes need to respect existing system boundaries)
 - `MEMORY.md` index + sub-files → past decisions and known gotchas
 

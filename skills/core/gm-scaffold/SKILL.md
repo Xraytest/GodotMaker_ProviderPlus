@@ -30,7 +30,7 @@ the role.
 
 Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"role": X, "ts": Y}`. Find the **last event** in the file.
 
-Scaffold is **lifetime-once** — its event gets archived after each milestone's finalize. So determine "already scaffolded" from project artifacts on disk, not the event log:
+Scaffold is **lifetime-once** — its event gets cleared after each tag's finalize (stage.jsonl is truncated). So determine "already scaffolded" from project artifacts on disk, not the event log:
 
 - If `project.godot` exists AND `addons/gecs/` exists AND `git log` has at least one commit → STOP. Tell the user:
   > "Project is already scaffolded. Recommended next: /gm-gdd.
