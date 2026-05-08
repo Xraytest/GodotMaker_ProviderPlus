@@ -71,14 +71,17 @@ def _is_project_root_assets_md(path_lower: str) -> bool:
     variants (`subdir/ASSETS.md`) and absolute paths to a different
     project's ASSETS.md are rejected — the asset role's contract and
     the deny message in `_check_main` are explicitly project-root only.
-    The abspath comparison is needed because Claude Code may pass
-    either form depending on how the agent constructs the file_path
-    argument.
+
+    Uses realpath (not abspath) because macOS routes /var/folders/...
+    through a /private/var/folders/... symlink — abspath leaves the
+    input untouched but cwd-derived paths often arrive already resolved,
+    so the two sides drift and a legitimately-rooted ASSETS.md gets
+    rejected. realpath collapses symlinks on both sides identically.
     """
     if path_lower == "assets.md":
         return True
-    abs_input = os.path.abspath(path_lower).replace("\\", "/").lower()
-    abs_root = os.path.abspath("assets.md").replace("\\", "/").lower()
+    abs_input = os.path.realpath(path_lower).replace("\\", "/").lower()
+    abs_root = os.path.realpath("assets.md").replace("\\", "/").lower()
     return abs_input == abs_root
 
 
