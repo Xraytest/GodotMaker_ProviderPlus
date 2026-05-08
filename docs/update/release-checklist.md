@@ -49,8 +49,9 @@ Steps to follow when publishing a new version of GodotMaker.
      applied-tracking is in any released version, this guidance no
      longer applies — drop it from your release notes for that release.
 
-3. **Update version numbers**
-   - `pyproject.toml` — update `version = "X.Y.Z"`
+3. **Update version numbers** — these MUST stay in lockstep. Skipping any one ships a half-bumped release.
+   - **`VERSION`** — single-line file at the repo root, content is the bare `X.Y.Z` (no leading `v`, no trailing newline issues). This is the **source-of-truth** `tools/publish.py` reads (`read_source_version()` at `tools/publish.py:43`) and writes into target projects' `.godotmaker/version`. Forgetting this bump causes downstream consumers (`godotmaker-cli`, `publish.py` upgrade detection) to see `installed_version != target_version` on every run, triggering an infinite "framework upgrade X.Y.Z-1 → X.Y.Z" loop that never converges.
+   - `pyproject.toml` — update `version = "X.Y.Z"`. Python package metadata only; not consumed by the publish pipeline, but kept in sync so PyPI/SDK consumers see the same number.
    - `CHANGELOG.md` — add a new `## [X.Y.Z] — YYYY-MM-DD` section with entries from the archived `next.md`
 
 4. **Run all tests locally**
