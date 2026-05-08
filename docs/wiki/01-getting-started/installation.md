@@ -6,7 +6,7 @@ GodotMaker turns a plain-English description into a playable Godot 4 game. To do
 
 | Tool | Minimum version | Why GodotMaker needs it | Where to get it |
 |------|-----------------|-------------------------|-----------------|
-| Godot | 4.4+ | Compiles and runs the generated game | https://godotengine.org/download |
+| Godot | 4.5+ | Compiles and runs the generated game | https://godotengine.org/download |
 | Git | 2.30+ | Tracks every file change; lets the AI work in parallel without conflicts | https://git-scm.com/downloads |
 | Node.js | 18+ | Provides `npx`, which GodotMaker uses to connect Claude Code to Godot | https://nodejs.org (choose the LTS version) |
 | Python | 3.9+ | Generates art, runs the environment check, and drives end-to-end tests | https://python.org/downloads |

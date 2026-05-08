@@ -33,7 +33,7 @@ If anything is missing, you'll see a list of failed checks and what to do about 
 
 ### Godot
 
-- Godot 4.4 or later is reachable as `godot` or `godot4` on your PATH.
+- Godot 4.5 or later is reachable as `godot` or `godot4` on your PATH.
 
 If Godot is not on your PATH, this check shows a warning rather than a hard failure — you can still provide the full path to the executable when you run `publish.py`, and it will be saved in `.claude/godotmaker.yaml` for future use.
 

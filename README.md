@@ -60,7 +60,7 @@ Then inside Claude Code, type the nine commands in order, starting with `/gm-sca
 
 | Tool | Why |
 |---|---|
-| [Godot 4.x](https://godotengine.org) | The game engine your project runs in |
+| [Godot 4.5+](https://godotengine.org) (recommended; 4.3/4.4 still supported) | The game engine your project runs in |
 | [Claude Code](https://claude.ai/code) | The AI you talk to |
 | Python 3.10+ | Runs the helper scripts |
 | `GOOGLE_API_KEY` | Free tier; used to generate art for your game |

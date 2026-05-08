@@ -10,7 +10,7 @@ cd GodotMaker
 pip install -r tools/requirements.txt
 ```
 
-You also need **Godot 4.4 or later** on your `PATH`. Run this to confirm everything is in place before you start:
+You also need **Godot 4.5 or later** on your `PATH`. Run this to confirm everything is in place before you start:
 
 ```bash
 python tools/check_env.py

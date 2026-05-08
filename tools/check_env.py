@@ -128,11 +128,11 @@ def check_godot(r: EnvCheck):
     print("\n--- Godot ---")
     for cmd in ("godot", "godot4"):
         version = get_version(cmd)
-        if version and parse_version(version)[:2] >= (4, 4):
-            r.ok(f"Godot {version} (>= 4.4), command: {cmd}")
+        if version and parse_version(version)[:2] >= (4, 5):
+            r.ok(f"Godot {version} (>= 4.5), command: {cmd}")
             return
         elif version:
-            r.fail(f"Godot {version} too old (>= 4.4 required)")
+            r.fail(f"Godot {version} too old (>= 4.5 required)")
             return
 
     r.warn(

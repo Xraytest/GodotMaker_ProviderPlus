@@ -6,7 +6,7 @@ GodotMaker 能把你用普通话描述的游戏想法，变成一个可以运行
 
 | 工具 | 最低版本 | GodotMaker 为什么需要它 | 下载地址 |
 |------|----------|------------------------|---------|
-| Godot | 4.4+ | 编译并运行生成的游戏 | https://godotengine.org/download |
+| Godot | 4.5+ | 编译并运行生成的游戏 | https://godotengine.org/download |
 | Git | 2.30+ | 追踪每一个文件改动；让 AI 能并行工作而不冲突 | https://git-scm.com/downloads |
 | Node.js | 18+ | 提供 `npx`，GodotMaker 用它把 Claude Code 连接到 Godot | https://nodejs.org（选 LTS 版本）|
 | Python | 3.9+ | 生成美术素材、运行环境检查、驱动端到端测试 | https://python.org/downloads |

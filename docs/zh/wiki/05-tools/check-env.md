@@ -33,7 +33,7 @@ All required checks passed! Ready to use GodotMaker.
 
 ### Godot
 
-- Godot 4.4 或更高版本可通过 PATH 中的 `godot` 或 `godot4` 命令访问。
+- Godot 4.5 或更高版本可通过 PATH 中的 `godot` 或 `godot4` 命令访问。
 
 如果 Godot 不在 PATH 中，这项检查会显示警告而非硬性失败——你仍可以在运行 `publish.py` 时手动输入可执行文件的完整路径，它会被保存到 `.claude/godotmaker.yaml` 供后续使用。
 

@@ -60,7 +60,7 @@ claude
 
 | 工具 | 用途 |
 |---|---|
-| [Godot 4.x](https://godotengine.org) | 你的游戏会跑在这个引擎里 |
+| [Godot 4.5+](https://godotengine.org)（推荐；4.3/4.4 仍然支持） | 你的游戏会跑在这个引擎里 |
 | [Claude Code](https://claude.ai/code) | 你和 AI 对话的入口 |
 | Python 3.10+ | 跑那些帮你串起流水线的脚本 |
 | `GOOGLE_API_KEY` | 免费额度；用来生成游戏的美术资源 |
