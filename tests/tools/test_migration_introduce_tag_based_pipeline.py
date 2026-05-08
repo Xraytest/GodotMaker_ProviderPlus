@@ -6,7 +6,6 @@ docs/tags/v0.1.0/ archive + a stub ROADMAP.md. Idempotent — second run
 is a no-op.
 """
 import importlib.util
-import os
 from pathlib import Path
 
 import pytest
