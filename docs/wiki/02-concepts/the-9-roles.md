@@ -1,8 +1,10 @@
-# The 9 roles
+# The 9 pipeline roles + 1 diagnostic role
 
-Each role is a slash command you type in Claude Code. Run them in order — you will be told if you skipped a prerequisite.
+Each role is a slash command you type in Claude Code. The 9 pipeline roles run in order — you will be told if you skipped a prerequisite. The 10th role, `/gm-rescue`, lives outside the main pipeline and is invoked only when something has stuck.
 
-The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very start of a project. `/gm-gdd` through `/gm-finalize` form one "milestone" — a round of design, build, and ship. After `/gm-finalize` closes a milestone, you can start the next one with another `/gm-gdd`.
+The pipeline runs **per tag** (SemVer: v0.1.0, v0.2.0, …). One full pass through `/gm-gdd → /gm-finalize` ships exactly one tag. `/gm-scaffold` runs once at the very start of a project. After `/gm-finalize` closes a tag, you can start the next one with another `/gm-gdd`.
+
+`ROADMAP.md` lists the planned tags; the earliest entry that does not yet have a `git tag` is the **current tag**.
 
 ---
 
@@ -25,63 +27,64 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 
 ## `/gm-gdd`
 
-**What it does:** Interviews you to understand what game you want, then writes the planning documents that everything else reads from.
+**What it does:** Plans the **current tag**. Runs in two modes depending on whether `ROADMAP.md` already exists:
 
-**When to run it:** After `/gm-scaffold` (first milestone), or after `/gm-finalize` (each subsequent milestone).
+- **Initial mode** (no `ROADMAP.md` yet): full Socratic interview about the whole game → produces `GDD.md` → derives `ROADMAP.md` (split into SemVer-tagged release tags) → asks you to confirm the roadmap → generates v0.1.0's working docs.
+- **Subsequent mode** (`ROADMAP.md` exists): focuses on the current tag's roadmap entry → asks if you want to keep, adjust, or rewrite the design → optionally updates `GDD.md` (old features marked `(superseded by …)` rather than deleted) and `ROADMAP.md` → generates the current tag's working docs (refactor tasks for prior-tag code if design contradicts what shipped).
 
-**What happens behind the scenes:**
-- Asks you questions about genre, mechanics, art style, scope, and platform
-- Writes `GDD.md` (the design contract), `PLAN.md` (task list), `STRUCTURE.md` (folder and architecture plan), `SCENES.md` (scene-by-scene description), `ASSETS.md` (art and audio needed), and `TOC.md` (table of contents)
+**When to run it:** After `/gm-scaffold` (first tag), or after `/gm-finalize` (each subsequent tag).
 
-**What you get:** A complete document set that the build, evaluate, and review steps will hold the game accountable to.
+**What you get:**
+- Cross-tag (root, accumulating): `GDD.md`, `ROADMAP.md`, plus new rows appended to `ASSETS.md`
+- Current tag (root, overwritten this round): `PLAN.md` (with `**Tag:**` header, Tag Mechanics list, Inherited Mechanics list), `STRUCTURE.md`, `SCENES.md`, `TOC.md`
 
-**Things to know:** The quality of this step determines the quality of the result. Be specific — "a top-down zombie shooter with wave-based spawning and a high-score screen" is much more useful than "a zombie game". You can edit the documents before running `/gm-asset`.
+**Things to know:** Be specific in the interview — "a top-down zombie shooter with wave-based spawning and a high-score screen" is much more useful than "a zombie game". The roadmap confirmation gate is mandatory; you cannot proceed to artifact generation until you confirm. You can edit any of the documents before running `/gm-asset`.
 
 ---
 
 ## `/gm-asset`
 
-**What it does:** Makes sure every art and audio file listed in `ASSETS.md` actually exists, and generates one visual reference image per scene described in `SCENES.md`, before the build starts.
+**What it does:** Fills in the new assets this tag introduces (working only on rows the current tag added; prior-tag rows are immutable here).
 
-**When to run it:** After `/gm-gdd`, before `/gm-build`.
+**When to run it:** After `/gm-gdd`, before `/gm-build`. Re-runnable any time during the tag if you add new art.
 
 **What happens behind the scenes:**
-- Reads `ASSETS.md` to find every asset the game needs
+- Reads the current tag's MISSING rows from `ASSETS.md`
 - For assets you have already provided: dispatches an Analyst helper to inspect your image files and record what they contain
-- For assets that are missing: generates them via an image generation API (Gemini or xAI, depending on your configuration)
+- For assets that are still missing: generates them via an image generation API (Gemini or xAI, depending on your configuration)
 - For each entry in `SCENES.md`: generates a target reference image at `references/scene_<name>.png` from the scene description, art direction, and your provided art style
-- Updates `ASSETS.md` with the actual file paths
+- Updates `ASSETS.md` with the actual file paths and final status
 
-**What you get:** Art files in `assets/`, scene reference images in `references/`, and a fully resolved `ASSETS.md` ready for the build step. The scene references become the visual contract that `/gm-evaluate` later compares running screenshots against.
+**What you get:** Art files in `assets/`, scene reference images in `references/`, and resolved status on this tag's `ASSETS.md` rows. The scene references become the visual contract that `/gm-evaluate` later compares running screenshots against.
 
-**Things to know:** You can re-run `/gm-asset` at any milestone if you add new assets to `ASSETS.md` or replace image files. It will only process what has changed.
+**Things to know:** If a previous tag's asset is broken, raise it as a fix task in `/gm-fixgap`.
 
 ---
 
 ## `/gm-build`
 
-**What it does:** Implements the game — all the GDScript code, scenes, and unit tests — by coordinating a team of specialised helpers.
+**What it does:** Implements the **current tag's** scope — all the GDScript code, scenes, and unit tests for this tag — by coordinating a team of specialised helpers.
 
-**When to run it:** After `/gm-asset`. Requires a completed `/gm-gdd` in the current milestone.
+**When to run it:** After `/gm-asset`. Requires a completed `/gm-gdd` for the current tag.
 
 **What happens behind the scenes:**
-- On resume, reads `.godotmaker/verify_report.json` if a fresh failure report exists from the previous `/gm-verify`, and translates each per-check failure into a `pending` task in `PLAN.md` before continuing
-- Reads `PLAN.md` to find pending tasks, starting with the riskiest ones
+- On resume, reads `.godotmaker/verify_report.json` if a fresh failure report exists from the previous `/gm-verify`, and translates each per-check failure into a `pending` task in the current tag's `PLAN.md` before continuing
+- Reads the current tag's `PLAN.md` to find pending tasks, starting with the riskiest ones
 - Dispatches Workers (up to 3 in parallel) — each Worker implements one game system and its unit tests, then reports back
 - After every 5 or so workers, dispatches a Verifier — a helper that compiles the project headlessly and runs the unit tests
 - After the Verifier passes, dispatches a Reviewer — a helper with domain knowledge about Godot pitfalls (physics, UI, animation, etc.) that checks for common mistakes
 - If the Reviewer finds problems, new tasks are added to `PLAN.md` and the cycle continues
 - The build ends only when every task in `PLAN.md` is marked `verified` and the last review round found nothing new
 
-**What you get:** Game code in `src/`, scenes in `scenes/`, unit tests in `tests/`.
+**What you get:** Game code in `src/`, scenes in `scenes/`, unit tests in `tests/` — all scoped to this tag's additions / refactors.
 
-**Things to know:** You cannot write game code yourself while in this step — the permission system blocks it. The main agent coordinates; Workers do the actual writing. If the same task fails three times, the build stops and asks you what to do.
+**Things to know:** You cannot write game code yourself while in this step — the permission system blocks it. The main agent coordinates; Workers do the actual writing. Workers may touch files outside the current tag's scope only when `PLAN.md` has an explicit refactor task naming those files; "cleanup detours" are not allowed. If the same task fails three times, the build stops and asks you what to do.
 
 ---
 
 ## `/gm-verify`
 
-**What it does:** Runs a fast mechanical check of the whole project — compile, unit tests, and file structure.
+**What it does:** Runs a fast mechanical check of the whole project — compile, unit tests, lint, project completeness. Tag-agnostic; runs against current state regardless of which tag you're on.
 
 **When to run it:** After `/gm-build`, and again after each `/gm-fixgap`.
 
@@ -94,24 +97,25 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 
 **What you get:** Two outputs — a chat-readable verification report you can scan, and `.godotmaker/verify_report.json` with the same information in a structured form. On success, `/gm-verify` also appends a `verify` event to `.godotmaker/stage.jsonl`.
 
-**Things to know:** `verify_report.json` is the protocol-level feedback channel for the next role in the loop — `/gm-build` and `/gm-fixgap` read it to translate failures into pending tasks instead of retrying blindly. Each check's `result` is one of `pass | warn | fail | error`: `fail` = project code has problems (fix the code), `error` = the verification tool itself crashed and the fix is a config change documented in `tooling_notes` (don't delete project code). Schema and consumer rules live in `gm-verify/SKILL.md`. If `/gm-verify` fails, go back to `/gm-build` (mid-build) or `/gm-fixgap` (post-evaluation) — both pick up the report automatically. If `/gm-verify` fails, go back to `/gm-build` (if you were mid-build) or `/gm-fixgap` (if you were post-evaluation) — both will pick up the report automatically.
+**Things to know:** `verify_report.json` is the protocol-level feedback channel for the next role in the loop — `/gm-build` and `/gm-fixgap` read it to translate failures into pending tasks instead of retrying blindly. Each check's `result` is one of `pass | warn | fail | error`: `fail` = project code has problems (fix the code), `error` = the verification tool itself crashed and the fix is a config change documented in `tooling_notes` (don't delete project code). Schema and consumer rules live in `gm-verify/SKILL.md`. `/gm-verify` does NOT enforce tag-specific E2E or regression — that's `/gm-evaluate`'s job. If verify fails, go back to `/gm-build` (mid-build) or `/gm-fixgap` (post-evaluation) — both pick up the report automatically.
 
 ---
 
 ## `/gm-evaluate`
 
-**What it does:** Independently assesses whether the game matches what the GDD promised, using end-to-end tests and screenshots.
+**What it does:** Independently assesses whether the **current tag** delivers what its `PLAN.md` claimed and whether every still-supported mechanic from prior tags still works.
 
 **When to run it:** After `/gm-verify` passes.
 
 **What happens behind the scenes:**
-- Reads `GDD.md`, `SCENES.md`, and `PLAN.md` fresh — with no memory of the build process
-- Writes end-to-end tests in `e2e/` that exercise every described feature through simulated player input
-- Runs those tests and records which pass and which fail
+- Reads the current tag's `PLAN.md` Tag Mechanics + Inherited Mechanics — with no memory of the build process
+- Maintains a single `e2e/` directory that always reflects the current game: writes new tests for this tag's Tag Mechanics, verifies inherited tests still exist, and prunes tests for mechanics PLAN's Main Build refactor tasks deliberately removed
+- Enforces the **playable-closed-loop hard gate**: headless boot + at least one mechanic E2E + at least one of {death, win, exit} ending exists
+- Runs the full `e2e/` suite — every test for every still-supported mechanic. A failing inherited mechanic is just as critical as a failing new one
 - Takes screenshots of each scene and compares them against reference images using a visual quality check
 - Produces a final verdict: approve or reject, with a list of specific problems if rejected
 
-**What you get:** `.godotmaker/evaluation.json` (the full verdict) and screenshots in `e2e/screenshots/`.
+**What you get:** `.godotmaker/evaluation.json` (the full verdict, with per-mechanic PASS/FAIL records) and screenshots in `e2e/screenshots/`.
 
 **Things to know:** The evaluator cannot write game code or touch `src/` — it is strictly read-only on game files. A rejection is not a failure; it is information. The problem list feeds directly into `/gm-fixgap`.
 
@@ -119,7 +123,7 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 
 ## `/gm-fixgap`
 
-**What it does:** Reads the evaluation's problem list and dispatches workers to fix each issue.
+**What it does:** Reads the evaluation's problem list and dispatches workers to fix each issue (within the current tag's scope).
 
 **When to run it:** After `/gm-evaluate` rejects the build.
 
@@ -131,47 +135,69 @@ The commands form two kinds of sequence. `/gm-scaffold` runs once, at the very s
 
 **What you get:** Updated game code, with `GAP.md` moved to the archive.
 
-**Things to know:** After `/gm-fixgap` finishes, run `/gm-verify` and then `/gm-evaluate` again. The loop continues until `/gm-evaluate` approves or you decide to stop.
+**Things to know:** Tag-scope discipline applies here too — fixes touching prior-tag code require an explicit GAP item naming those files. After `/gm-fixgap` finishes, run `/gm-verify` and then `/gm-evaluate` again. The loop continues until `/gm-evaluate` approves; if you see no progress after several rounds, run `/gm-rescue` to diagnose whether godotmaker itself is the blockage.
 
 ---
 
 ## `/gm-accept`
 
-**What it does:** Presents the approved build to you and records your decision.
+**What it does:** Presents the approved tag to you and records your decision.
 
 **When to run it:** After `/gm-evaluate` approves.
 
 **What happens behind the scenes:**
-- Shows you the final evaluation summary and screenshots
-- Asks: accept, reject (go back to `/gm-fixgap`), or stop
+- Shows you a per-tag summary: tag mechanics delivered, inherited mechanics still passing, screenshots, known limitations, what's left in the roadmap
+- Asks: accept (proceed to `/gm-finalize`), reject (go back to `/gm-fixgap`), or stop
 - Records your answer in `.godotmaker/stage.jsonl`
 
-**What you get:** A recorded acceptance event, or a clear instruction to loop back.
+**What you get:** A recorded acceptance event for this tag, or a clear instruction to loop back.
 
-**Things to know:** Rejecting here is valid — if you see something in the screenshots you do not like, you can send it back for another round. Your decision is always the final word.
+**Things to know:** Accepting here means **this tag is ready to seal** — not that the whole game is done. You can stop the project at any tag boundary; the user-decision authority is yours, not the tooling's.
 
 ---
 
 ## `/gm-finalize`
 
-**What it does:** Closes out the milestone cleanly — archives records, writes a summary, and stamps it as done.
+**What it does:** Seals the **current tag** — archives the working docs, writes a per-tag changelog, runs `git tag <Tag>`, and resets per-tag runtime state for the next round.
 
 **When to run it:** After `/gm-accept` records an acceptance.
 
 **What happens behind the scenes:**
-- Writes `.godotmaker/final_report.json` summarising what was built, what tasks were completed, and the evaluation result
-- Archives milestone documents (`GDD.md`, `PLAN.md`, etc.) so they are not overwritten by the next milestone
+- Verifies the project still builds clean and `evaluation.json` says `approve`
+- Copies the current `GDD.md`/`PLAN.md`/`STRUCTURE.md`/`SCENES.md`/`MEMORY.md` (full snapshots) and `evaluation.json` into `docs/tags/<Tag>/`
+- Generates `docs/tags/<Tag>/CHANGELOG.md` summarising delivered mechanics, added systems, and any cross-tag refactors
+- Runs `git tag <Tag>` locally (does not push)
+- Truncates `.godotmaker/stage.jsonl` and resets per-tag runtime state so the next `/gm-gdd` starts on a clean slate
 
-**What you get:** A clean project ready for the next milestone, with the current milestone's records preserved.
+**What you get:** An immutable archive at `docs/tags/<Tag>/`, a local git tag, and a clean per-tag state for the next round.
 
-**Things to know:** After `/gm-finalize`, the next step is another `/gm-gdd` if you want to add more features. `/gm-scaffold` does not run again — the project already exists.
+**Things to know:** This skill does NOT package a release zip; release packaging is a separate concern (a future skill). `/gm-finalize` does not push the git tag — that decision is yours.
 
 ---
 
-## What is a milestone?
+## `/gm-rescue` (out-of-pipeline)
 
-One milestone = one round of `/gm-gdd` → `/gm-asset` → `/gm-build` → `/gm-verify` → `/gm-evaluate` → (fixgap loop) → `/gm-accept` → `/gm-finalize`.
+**What it does:** Diagnoses whether the pipeline is stuck because of a defect in godotmaker itself (hooks, skills, config, templates), or because of something outside godotmaker's responsibility (GDD self-contradiction, AI implementation difficulty, environment issues).
 
-The first milestone builds the core game. Each subsequent milestone adds a new feature set or major revision. This lets you grow the game incrementally without starting from scratch, and it keeps each `/gm-build` session small enough to be reliable.
+**When to run it:** Only when the pipeline is stuck — typically after several `/gm-fixgap` rounds fail to converge, or when you suspect a framework bug rather than a game-code bug.
+
+**What happens behind the scenes:**
+- Reads the runtime artifacts (`.godotmaker/current_role`, `stage.jsonl`, `evaluation.json`, recent `traces/`, `metrics.jsonl`) and the per-tag working docs (`PLAN.md`, `GAP.md` if present, `MEMORY.md`)
+- Walks the godotmaker layers (hooks → SKILL.md → config → templates → shared refs → tools) looking for a defect that matches the symptom
+- Outputs a diagnosis to chat — never modifies game code, never writes files (the only mutations are setting `.godotmaker/current_role` to `rescue` and appending one rescue event to `stage.jsonl`)
+- If a godotmaker defect is found: drafts a GitHub issue text you can review and post upstream
+- If not a godotmaker defect: explicitly tells you so, and points at the likely cause (GDD logic, missing assets, AI capability ceiling, etc.)
+
+**What you get:** A chat message with the diagnosis. No file changes anywhere.
+
+**Things to know:** Privacy — the issue draft excludes absolute project paths, your project's source code, and your GDD content by default. You decide whether to redact further before posting. `/gm-rescue` does not loop or retry; it diagnoses once and reports.
+
+---
+
+## What is a tag?
+
+One tag = one round of `/gm-gdd` → `/gm-asset` → `/gm-build` → `/gm-verify` → `/gm-evaluate` → (fixgap loop) → `/gm-accept` → `/gm-finalize`.
+
+`ROADMAP.md` lists the planned tags. The first tag (always `v0.1.0`) delivers the playable closed loop — the smallest playable game. Each later tag adds a feature set or major revision. This lets you grow the game incrementally and gives you a chance to stop, ship, or pivot at every tag boundary.
 
 For a bird's-eye view of how the phases connect, see [how-it-works.md](how-it-works.md).

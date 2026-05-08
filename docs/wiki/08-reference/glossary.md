@@ -4,7 +4,7 @@ Definitions for terms you'll see across the GodotMaker docs and slash-command ou
 
 ---
 
-**Accept** / **Acceptance** — The eighth role in the pipeline, triggered by `/gm-accept`. The AI presents the current build to you and asks whether you want to accept it, send it back for another round of fixes, or stop. Your decision is recorded as an `accept` event in `.godotmaker/stage.jsonl`. See also: *Milestone*, *Role*.
+**Accept** / **Acceptance** — The eighth role in the pipeline, triggered by `/gm-accept`. The AI presents the **current tag's** deliverable to you and asks whether you want to seal it (proceed to `/gm-finalize`), send it back for another round of fixes, or stop. Your decision is recorded as an `accept` event in `.godotmaker/stage.jsonl`. Acceptance is per-tag — accepting now does not mean the whole game is done, just that this tag is ready to ship. See also: *Tag*, *Role*.
 
 **Analyst** — A sub-agent spawned by `/gm-asset` to inspect image files you provide. The main agent is blocked from reading images directly (to avoid burning context on raw pixel data), so it delegates image analysis to an analyst. The analyst reports back with an art-style summary and a list of usable assets. See also: *Sub-agent*.
 
@@ -18,7 +18,7 @@ Definitions for terms you'll see across the GodotMaker docs and slash-command ou
 
 **Entity** (ECS) — A unique numeric ID that represents a "thing" in the game world (a player, an enemy, a bullet). An entity has no data or behaviour of its own; it only gains meaning through the components attached to it. See also: *ECS*, *Component*.
 
-**Evaluation** / **Evaluator** — The sixth role in the pipeline, triggered by `/gm-evaluate`. An independent agent runs the game headlessly, captures screenshots, and scores the result against the GDD. It writes its findings to `.godotmaker/evaluation.json` and stores screenshots in `e2e/screenshots/`. The results feed directly into the next role, `/gm-fixgap`. See also: *Role*, *Visual QA*.
+**Evaluation** / **Evaluator** — The sixth role in the pipeline, triggered by `/gm-evaluate`. Independently scores whether the current tag delivers what its `PLAN.md` promised: enforces the playable-closed-loop hard gate, runs the `e2e/` suite, captures screenshots, and compares them against scene reference images. Writes its verdict to `.godotmaker/evaluation.json`; the result feeds `/gm-fixgap`. See also: *Role*, *Tag*, *Visual QA*.
 
 **Fixgap** / **GAP.md** — The seventh role, triggered by `/gm-fixgap`. It reads the evaluation report, creates a `GAP.md` file listing every gap between what the GDD describes and what the game currently does, and dispatches workers to address each issue. After the fixes are done, `GAP.md` is archived to `.godotmaker/gaps/<n>/`. See also: *Role*, *Worker*.
 
@@ -28,7 +28,11 @@ Definitions for terms you'll see across the GodotMaker docs and slash-command ou
 
 **Hook** — A small Python script that Claude Code runs automatically on specific events (session start, before a file write, after a sub-agent finishes, etc.). Hooks enforce pipeline rules — for example, blocking the main agent from writing game code during the evaluate role, or refusing to let `/gm-build` end if it dispatched workers but never ran a verifier. Hooks live in `.godotmaker/hooks/` inside the generated project. See `docs/hooks.md` for the full list.
 
-**Milestone** — One complete pass through the pipeline from `/gm-gdd` to `/gm-finalize`. After a milestone is done you can start the next one with a fresh `/gm-gdd` to add features or change direction. `/gm-scaffold` is a once-per-project step and does not repeat between milestones.
+**Milestone** — Older synonym for *Tag*, used in pre-v0.3.0 docs. The current canonical term is *Tag*; "milestone" only survives in archived release notes (e.g. `docs/update/v0.2.x.md`) — it is no longer used in active hooks, skills, templates, or wiki pages.
+
+**Rescue** — Out-of-pipeline diagnostic role triggered by `/gm-rescue`. Invoked when the pipeline is stuck (typically after several `/gm-fixgap` rounds fail to converge). Inspects godotmaker's hooks, skills, config, and templates to determine whether the blockage is a framework defect; outputs to chat only (no file writes, no code changes). If a defect is found, drafts a GitHub issue text the user reviews and posts upstream. Privacy: the issue draft excludes project paths, project source code, and GDD content by default. See also: *Tag*.
+
+**ROADMAP.md** — A live document at the project root (produced by the first `/gm-gdd` run, edited by subsequent runs) that lists every tag planned for the project in SemVer order. Each tag entry has a one-line theme + bullet list of features. The earliest entry that does not yet have a `git tag` is the **current tag**. Tags that already have a `git tag` are immutable in this file.
 
 **PLAN.md** — The task list produced by `/gm-gdd`. It breaks the GDD down into discrete implementation tasks, each with a status field (`pending` / `in_progress` / `completed` / `verified`). `/gm-build` works through this list by dispatching a worker per task. The hook `stage_reminder.py` refuses to let `/gm-build` finish until every task is marked `verified`.
 
@@ -42,6 +46,8 @@ Definitions for terms you'll see across the GodotMaker docs and slash-command ou
 
 **Stage vs Role** — "Stage" was the original GodotMaker term for a pipeline step, and references to an "8-stage pipeline" described the first architecture. The pipeline has been redesigned as 9 role-based commands with no central orchestrator. The word "stage" may still appear in some file names (e.g., `stage_schemas.json`, `stage.jsonl`) and older docs, but the canonical term going forward is "role." See also: *Role*.
 
+**Tag** — One full pass through the pipeline from `/gm-gdd` to `/gm-finalize` produces one **tag** (SemVer-named: `v0.1.0`, `v0.2.0`, …). After `/gm-finalize` archives the tag's working docs to `docs/tags/<Tag>/` and runs `git tag <Tag>` locally, you can start the next tag with another `/gm-gdd`, or stop the project. The first tag (`v0.1.0`) is always the MVP — it must deliver the playable closed loop. See also: *ROADMAP.md*, *Milestone*.
+
 **stage.jsonl** — An append-only log file at `.godotmaker/stage.jsonl`. Every time a `/gm-*` role finishes successfully, it appends one JSON line: `{"role": "<name>", "ts": "<iso-timestamp>"}`. The `check_stage_prerequisites.py` hook reads this file to confirm that required earlier roles have completed before allowing a new role to start. "jsonl" means each line is a separate valid JSON object.
 
 **STRUCTURE.md** — A planning document produced by `/gm-gdd` that describes the folder layout of the generated project: which directories exist, what kinds of files go in each, and how the source tree is organised.
@@ -50,7 +56,7 @@ Definitions for terms you'll see across the GodotMaker docs and slash-command ou
 
 **System** (ECS) — A function (or GDScript class) that runs every frame over all entities that have a specific combination of components. For example, a `MovementSystem` might run over every entity that has both a `Velocity` component and a `Position` component, updating the position each frame. Systems contain all the game logic. See also: *ECS*, *Entity*, *Component*.
 
-**TOC.md** — A table of contents document produced by `/gm-gdd` that lists all planning documents and their locations. It gives a quick overview of what exists in the project at the start of each milestone.
+**TOC.md** — A table of contents document produced by `/gm-gdd` that lists all planning documents and their locations. It gives a quick overview of what exists in the project at the start of each tag.
 
 **Verifier** — A sub-agent that runs the headless Godot build and the unit tests written by a worker, then reports whether they pass. The verifier also runs "adversarial probes" — targeted tests for edge cases and error handling. If verification fails, the issue goes back to the worker. See also: *Sub-agent*, *Worker*, *Reviewer*.
 

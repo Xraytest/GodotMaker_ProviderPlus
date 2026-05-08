@@ -48,7 +48,7 @@ flowchart TD
 
 如果 `/gm-evaluate` 拒绝，你改为运行 `/gm-fixgap`。它读取评估报告的问题列表，生成修复计划，派 Worker 逐一处理，然后重新回到 `/gm-verify` 和 `/gm-evaluate`。这个循环一直持续，直到你拿到通过结果。
 
-通过之后，`/gm-finalize` 收尾：归档里程碑记录、写最终报告，把这个里程碑标记为完成。然后你可以用下一个 `/gm-gdd` 开始新的里程碑。
+通过之后，`/gm-finalize` 收尾：把当前 tag 的工作文档归档到 `docs/tags/<Tag>/`、写一份按 tag 的 changelog、在本地执行 `git tag <Tag>`，并重置每 tag 的运行时状态。然后你可以用下一个 `/gm-gdd` 开启下一个 tag，或者就停在这里。
 
 ---
 

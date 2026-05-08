@@ -16,9 +16,9 @@ There are nine role skills, each responsible for one phase of game creation. You
 | `/gm-evaluate` | Runs the game independently, takes screenshots, and scores the result against the GDD | A verified project | `.godotmaker/evaluation.json`, screenshots in `e2e/screenshots/` |
 | `/gm-fixgap` | Reads the evaluation report, generates a list of issues, and dispatches workers to fix them | An evaluation from `/gm-evaluate` | Updated game code, `GAP.md` archived to `.godotmaker/gaps/<n>/` |
 | `/gm-accept` | Shows you the current state and asks whether to accept it, go back for more fixes, or stop | A complete build cycle | Acceptance event recorded in `.godotmaker/stage.jsonl` |
-| `/gm-finalize` | Tidies up, archives the milestone records, and stamps it as done | An accepted build | `.godotmaker/final_report.json` |
+| `/gm-finalize` | Archives the tag's working docs to `docs/tags/<Tag>/`, runs `git tag <Tag>` locally, resets per-tag runtime state | An accepted build | `docs/tags/<Tag>/` archive, `.godotmaker/final_report.json`, local git tag |
 
-After `/gm-finalize` you can begin a new milestone by running `/gm-gdd` again (for example, to add a new feature). `/gm-scaffold` is a one-time step per project.
+After `/gm-finalize` you can begin the next tag by running `/gm-gdd` again (for example, to add a new feature). `/gm-scaffold` is a one-time step per project.
 
 For a deeper look at what each role does and the decisions it makes, see [The 9 roles](../02-concepts/the-9-roles.md).
 

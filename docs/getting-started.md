@@ -163,6 +163,22 @@ It bounces off all four walls. No player input needed.
 
 **Important:** Always start with `/gm-scaffold` and let each role hand off to the next. The pipeline is enforced by hooks — `.godotmaker/current_role` decides who can write what, and `stage.jsonl` tracks role completion. Writing game code without the role skills bypasses the permission lock and quality gates.
 
+### How tag iteration works
+
+After `/gm-scaffold`, the pipeline runs **per tag**: one full pass through `/gm-gdd → /gm-asset → /gm-build → /gm-verify → /gm-evaluate → /gm-fixgap (loop) → /gm-accept → /gm-finalize` ships **one** SemVer release tag (v0.1.0, v0.2.0, …).
+
+- The first `/gm-gdd` run interviews the user about the whole game, derives a `ROADMAP.md` (split into tags), and asks the user to confirm the roadmap before generating v0.1.0's working docs.
+- Each later `/gm-gdd` run focuses on the next tag in `ROADMAP.md` (the earliest entry without a `git tag`). The user can adjust roadmap or GDD design at this point — changes that contradict shipped tags become explicit refactor tasks in the new `PLAN.md`.
+- `/gm-finalize` archives the tag's working docs to `docs/tags/<tag>/`, runs `git tag <tag>`, and resets per-tag runtime state. The user then chooses to start the next tag (re-run `/gm-gdd`) or stop.
+
+Cross-tag (always at root): `GDD.md`, `ROADMAP.md`, `MEMORY.md`, `ASSETS.md` (assets are reusable across tags; each row carries a `Tag` column marking the introducing tag).
+Per-tag (root, overwritten each `/gm-gdd`): `PLAN.md`, `STRUCTURE.md`, `SCENES.md`.
+Per-tag archives (immutable): `docs/tags/<tag>/`.
+
+### When the pipeline gets stuck
+
+If a tag's fixgap loop won't converge, run `/gm-rescue`. Rescue is a **diagnostic-only** skill — it inspects godotmaker's hooks/skills/config to determine whether the blockage is a framework defect, and reports to chat. It never modifies game code. If rescue concludes godotmaker is the cause, it drafts an issue you can copy to the upstream repo.
+
 ## Project Configuration
 
 After publishing, `.godotmaker/config.yaml` contains project-level settings:
@@ -225,18 +241,19 @@ Run `python tools/check_env.py` and fix each `[FAIL]` item. The output includes 
 
 ## What Happens During Game Generation
 
-The pipeline runs as 9 role-based skills, each invoked in turn. Each role owns a single phase and a write-permission scope (enforced by `.godotmaker/current_role`).
+The pipeline runs as 9 role-based pipeline skills (run **once per tag** after the one-time scaffold), plus 1 out-of-pipeline diagnostic skill. Each role owns a single phase and a write-permission scope (enforced by `.godotmaker/current_role`).
 
-| Order | Role | What it does |
-|-------|------|---|
-| 1 | `/gm-scaffold` | Creates Godot project skeleton, addons (gecs, gdUnit4), base components |
-| 2 | `/gm-gdd` | Clarifies the game with the user → writes `GDD.md`, `PLAN.md`, `STRUCTURE.md`, `SCENES.md` |
-| 3 | `/gm-asset` | Generates per-scene visual targets (`references/scene_*.png`) and game assets via the analyst subagent |
-| 4 | `/gm-build` | Dispatches workers + verifiers + reviewers to implement each `PLAN.md` task |
-| 5 | `/gm-verify` | Mechanical verification: headless build + unit tests + project completeness |
-| 6 | `/gm-evaluate` | Independent E2E + VQA pass against `GDD.md` and the scene references — owns `e2e/` exclusively |
-| 7 | `/gm-fixgap` | If `/gm-evaluate` rejects: writes a `GAP.md` and dispatches workers to close the gap, then loops back to `/gm-verify` |
-| 8 | `/gm-accept` | Human acceptance — runs the game, confirms delivery |
-| 9 | `/gm-finalize` | Writes the final report, marks the project done |
+| Order | Role | Per-tag? | What it does |
+|-------|------|----------|---|
+| 1 | `/gm-scaffold` | once (project setup) | Creates Godot project skeleton, addons (gecs, gdUnit4), base components |
+| 2 | `/gm-gdd` | per tag | Clarifies the game with the user (initial: full interview + derives `ROADMAP.md`; subsequent: focuses next tag, optionally updates `GDD.md` / `ROADMAP.md`) → writes the current tag's `PLAN.md`, `STRUCTURE.md`, `SCENES.md`, and appends new rows to the cross-tag `ASSETS.md` |
+| 3 | `/gm-asset` | per tag | Generates per-scene visual targets (`references/scene_*.png`) and the current tag's missing assets |
+| 4 | `/gm-build` | per tag | Dispatches workers + verifiers + reviewers to implement each `PLAN.md` task (current tag scope) |
+| 5 | `/gm-verify` | per tag | Mechanical verification: headless build + unit tests + project completeness (whole project; tag-agnostic) |
+| 6 | `/gm-evaluate` | per tag | Enforces the playable-closed-loop hard gate and runs the `e2e/` suite |
+| 7 | `/gm-fixgap` | per tag | If `/gm-evaluate` rejects: writes a `GAP.md` and dispatches workers to close the gap, then loops back to `/gm-verify` |
+| 8 | `/gm-accept` | per tag | Presents the tag's deliverable to the user; user decides to seal, fix more, or stop |
+| 9 | `/gm-finalize` | per tag | Archives docs to `docs/tags/<tag>/`, writes per-tag `CHANGELOG.md`, runs `git tag <tag>`, resets runtime state for the next tag |
+| — | `/gm-rescue` | out-of-pipeline | Diagnostic-only; runs when the pipeline is stuck. Checks whether the blockage is a godotmaker defect; outputs to chat only; drafts an upstream issue for the user to review and post |
 
-Each role does its own Resume Check at startup, so re-invoking the same role is safe. You can interrupt at any point to give feedback or redirect.
+Each role does its own Resume Check at startup, so re-invoking the same role is safe. You can interrupt at any point to give feedback or redirect. After `/gm-finalize` completes for one tag, re-run `/gm-gdd` to start the next, or stop the project right there.

@@ -16,9 +16,9 @@ Core 技能分为两类：九个通过斜杠命令调用的角色技能，以及
 | `/gm-evaluate` | 独立运行游戏，截图并对照 GDD 给结果评分 | 已通过验证的项目 | `.godotmaker/evaluation.json`，`e2e/screenshots/` 下的截图 |
 | `/gm-fixgap` | 读取评估报告，生成问题列表，并派发 Worker 逐一修复 | `/gm-evaluate` 产出的评估结果 | 更新后的游戏代码，`GAP.md` 归档到 `.godotmaker/gaps/<n>/` |
 | `/gm-accept` | 展示当前状态，询问你是接受结果、继续修复，还是停止 | 完整的构建周期 | 接受事件记录到 `.godotmaker/stage.jsonl` |
-| `/gm-finalize` | 整理收尾，归档里程碑记录，标记为完成 | 已接受的构建 | `.godotmaker/final_report.json` |
+| `/gm-finalize` | 把当前 tag 的工作文档归档到 `docs/tags/<Tag>/`、本地执行 `git tag <Tag>`、重置每 tag 的运行时状态 | 已接受的构建 | `docs/tags/<Tag>/` 归档、`.godotmaker/final_report.json`、本地 git tag |
 
-`/gm-finalize` 完成后，你可以再次运行 `/gm-gdd` 开启新的里程碑（例如添加新功能）。`/gm-scaffold` 是每个项目只需执行一次的步骤。
+`/gm-finalize` 完成后，你可以再次运行 `/gm-gdd` 开启下一个 tag（例如添加新功能）。`/gm-scaffold` 是每个项目只需执行一次的步骤。
 
 想深入了解每个角色的职责和它做出的各种决策，见 [九个角色](../02-concepts/the-9-roles.md)。
 

@@ -1,6 +1,6 @@
 # Check your project
 
-`check_project.py` inspects a generated game project for missing files, broken structure, and other inconsistencies. Run this when a build is acting strange or before publishing a milestone.
+`check_project.py` inspects a generated game project for missing files, broken structure, and other inconsistencies. Run this when a build is acting strange or before sealing a tag.
 
 ```bash
 python tools/check_project.py /path/to/my-game

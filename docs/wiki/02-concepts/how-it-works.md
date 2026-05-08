@@ -48,7 +48,7 @@ If `/gm-evaluate` approves, you run `/gm-accept`. GodotMaker shows you the resul
 
 If `/gm-evaluate` rejects, you run `/gm-fixgap` instead. It reads the evaluation's problem list, generates a fix plan, dispatches workers to address each issue, and then loops back to `/gm-verify` and `/gm-evaluate`. This loop repeats until you get an approval.
 
-Once you accept, `/gm-finalize` tidies up: it archives the milestone records, writes a final report, and marks the milestone as complete. At that point you can start the next milestone with another `/gm-gdd`.
+Once you accept, `/gm-finalize` tidies up: it archives the tag's working docs into `docs/tags/<Tag>/`, writes a per-tag changelog, runs `git tag <Tag>` locally, and resets the per-tag runtime state. At that point you can start the next tag with another `/gm-gdd`, or stop here.
 
 ---
 

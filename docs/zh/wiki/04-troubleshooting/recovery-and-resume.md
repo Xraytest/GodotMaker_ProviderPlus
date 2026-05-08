@@ -100,16 +100,16 @@ python tools/check_project.py <path-to-game>
 | 角色 | 可重跑？ | 备注 |
 |------|---------|------|
 | `/gm-scaffold` | 每个项目只能跑一次 | 用于创建 Godot 项目结构和初始 git 提交。在已有项目上再跑会和现有文件冲突，不要重跑。 |
-| `/gm-gdd` | 可以 | 会重新访谈你并重写规划文档。每个新里程碑开始时用这个。 |
+| `/gm-gdd` | 可以 | 会重新访谈你并重写规划文档。每个新 tag 开始时用这个。 |
 | `/gm-asset` | 可以 | 已存在的资源会跳过，只生成缺失的。 |
 | `/gm-build` | 可以 | 从当前 `PLAN.md` 的状态继续。 |
 | `/gm-verify` | 可以 | 机械检查，随时重跑都安全。 |
 | `/gm-evaluate` | 可以 | 用最新结果覆盖 `evaluation.json`。 |
 | `/gm-fixgap` | 可以 | 每次运行都会在 `.godotmaker/gaps/<n>/` 下创建一次新的迭代。 |
 | `/gm-accept` | 可以 | 显示当前结果并再次询问确认。 |
-| `/gm-finalize` | 可以 | 归档里程碑；如果第一次漏掉了什么，重跑是安全的。 |
+| `/gm-finalize` | 每个 tag 一次 | 归档当前 tag 的工作文档并执行 `git tag <Tag>`。已封口的 tag 重跑会因 git tag 已存在而失败——如果 finalize 在封口前中断，可以再跑一次；如果想修改已封口的 tag，开一个新 tag。 |
 
-`/gm-finalize` 完成后，下一个里程碑从 `/gm-gdd` 开始（不是 `/gm-scaffold`）。
+`/gm-finalize` 完成后，下一个 tag 从 `/gm-gdd` 开始（不是 `/gm-scaffold`）。
 
 ---
 

@@ -32,9 +32,9 @@ Yes. GodotMaker supports both GDScript and C#. ECS components and systems can be
 
 ## Pipeline behaviour
 
-### What is a milestone?
+### What is a tag?
 
-A milestone is one complete pass through the pipeline: from `/gm-gdd` (write the design) through `/gm-finalize` (stamp it done). When you want to add a new feature or change direction, you start another milestone by running `/gm-gdd` again. `/gm-scaffold` runs only once per project and does not repeat between milestones.
+A **tag** is one complete pass through the pipeline: from `/gm-gdd` (write the design for this round) through `/gm-finalize` (archive the working docs and stamp `git tag <Tag>`). Tags are SemVer-named — the first tag is always `v0.1.0` and must deliver a playable closed loop; later tags add a feature set or rework existing systems. `ROADMAP.md` lists the planned tags; the earliest one without a `git tag` is the current tag. When you want to add a new feature or change direction, start the next tag by running `/gm-gdd` again. `/gm-scaffold` runs only once per project and is not repeated between tags.
 
 ### What if I want to stop halfway through?
 
@@ -48,7 +48,7 @@ No. Each `/gm-*` skill writes its name to `.godotmaker/current_role` when it sta
 
 ### Why are some commands re-runnable and others are not?
 
-`/gm-scaffold` is a once-per-project command — re-running it on an existing project would overwrite the project setup. `/gm-asset` is re-runnable within a milestone whenever new assets are needed. The roles from `/gm-build` onward follow the milestone cycle: they should run in order, and re-running one re-does that phase of the current milestone. `/gm-gdd` starts a new milestone cycle.
+`/gm-scaffold` is a once-per-project command — re-running it on an existing project would overwrite the project setup. `/gm-asset` is re-runnable within a tag whenever new assets are needed. The roles from `/gm-build` onward follow the per-tag cycle: they should run in order, and re-running one re-does that phase of the current tag. `/gm-gdd` starts a new tag.
 
 ### What happens inside `/gm-build`?
 
@@ -68,7 +68,7 @@ AI code generation is not deterministic, and complex interactions between game s
 
 ### Can I edit the generated code by hand?
 
-Yes, and your edits will be preserved. Be aware that if you run `/gm-build` again for a new milestone, it may add new tasks that touch the same files — so your edits could be extended or partially overwritten by new worker output. Keep your hand-edits focused and document them in `MEMORY.md` so the AI knows they were intentional.
+Yes, and your edits will be preserved. Be aware that if you run `/gm-build` again for a new tag, it may add new tasks that touch the same files — so your edits could be extended or partially overwritten by new worker output. Keep your hand-edits focused and document them in `MEMORY.md` so the AI knows they were intentional.
 
 ### Where do I find screenshots and test results?
 

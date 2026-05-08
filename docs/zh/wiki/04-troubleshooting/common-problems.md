@@ -124,12 +124,12 @@ git config --global user.email "you@example.com"
 
 ---
 
-### "Build already completed for this milestone..."
+### "Build already completed for the current tag..."
 
 **症状：**
 
 ```
-Build already completed for this milestone at <timestamp>. Recommended next: /gm-verify.
+Build already completed for the current tag at <timestamp>. Recommended next: /gm-verify.
 If you need to redo this step or have other plans, just tell me.
 ```
 

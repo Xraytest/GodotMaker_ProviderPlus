@@ -167,7 +167,7 @@ You will see a lot of output as tasks are dispatched and reported back. This is 
 
 **What to expect:** The AI presents the current state of the game and asks you to make a decision:
 
-- **Accept** — you're happy with this milestone; move on to finalising.
+- **Accept** — you're happy with this tag; move on to finalising.
 - **Reject (loop back)** — something is still wrong; the AI will return to `/gm-fixgap` and try again.
 - **Stop** — you want to leave the session here and come back later.
 
@@ -185,11 +185,11 @@ You will see a lot of output as tasks are dispatched and reported back. This is 
 /gm-finalize
 ```
 
-**What to expect:** The AI tidies everything up — archives the milestone's records, updates `MEMORY.md` so future sessions remember what was built, and stamps the milestone as complete. This is a short, automatic step.
+**What to expect:** The AI tidies everything up — archives the tag's working docs into `docs/tags/<Tag>/`, writes a per-tag changelog, runs `git tag <Tag>` locally, and resets per-tag runtime state so the next `/gm-gdd` starts clean. This is a short, automatic step.
 
-**What lands on disk:** `.godotmaker/final_report.json`, updated `MEMORY.md`.
+**What lands on disk:** `docs/tags/<Tag>/` archive, `.godotmaker/final_report.json`, a local git tag.
 
-**When you know it's done:** The AI confirms the milestone is sealed and the project is ready to open in Godot.
+**When you know it's done:** The AI confirms the tag is sealed and the project is ready to open in Godot.
 
 ---
 

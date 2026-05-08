@@ -124,12 +124,12 @@ These messages appear when you try to run a `/gm-*` command out of order. Each r
 
 ---
 
-### "Build already completed for this milestone..."
+### "Build already completed for the current tag..."
 
 **Symptom:**
 
 ```
-Build already completed for this milestone at <timestamp>. Recommended next: /gm-verify.
+Build already completed for the current tag at <timestamp>. Recommended next: /gm-verify.
 If you need to redo this step or have other plans, just tell me.
 ```
 

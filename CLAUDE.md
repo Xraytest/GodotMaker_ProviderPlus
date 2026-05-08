@@ -61,9 +61,20 @@ python tools/check_env.py
 
 ## Skill System (Three Layers)
 
-- **Layer 1 — Core**: 9 role-based pipeline skills (`gm-scaffold`, `gm-gdd`, `gm-asset`, `gm-build`, `gm-verify`, `gm-evaluate`, `gm-fixgap`, `gm-accept`, `gm-finalize`) + supporting skills (game-planner, project-scaffold, godot-api, gecs, input-mapper, headless-build, gdunit-driver, godot-e2e, gdtoolkit, visual-qa, screenshot, mcp-driver)
+- **Layer 1 — Core**:
+  - **9 pipeline skills** (run in tag iteration): `gm-scaffold` (once), then per tag: `gm-gdd → gm-asset → gm-build → gm-verify → gm-evaluate → gm-fixgap (loop) → gm-accept → gm-finalize`
+  - **1 out-of-pipeline skill**: `gm-rescue` — diagnostic-only, invoked manually when the pipeline is stuck; checks whether the blockage is a godotmaker defect; never modifies game code
+  - **Supporting skills**: game-planner, project-scaffold, godot-api, gecs, input-mapper, headless-build, gdunit-driver, godot-e2e, gdtoolkit, visual-qa, screenshot, mcp-driver
 - **Layer 2 — Reviewer** (8 skills): physics, animation, ui, tilemap, navigation, shader, audio, particles — each has SKILL.md + gotchas.md + checklist.md
 - **Layer 3 — Pattern**: per game genre (deferred)
+
+## Tag-iterative pipeline
+
+Each game project ships in **SemVer-tagged release tags** (v0.1.0, v0.2.0, …). One full pipeline pass produces one tag. `ROADMAP.md` lists the planned tags; the earliest entry without a `git tag` is the **current tag**, and the per-tag root documents (`PLAN.md`, `STRUCTURE.md`, `SCENES.md`) are scoped to it. `gm-finalize` archives the tag's working docs to `docs/tags/<tag>/`, runs `git tag <tag>`, and resets per-tag runtime state for the next round.
+
+Cross-tag (root, accumulating): `GDD.md`, `ROADMAP.md`, `MEMORY.md`, `ASSETS.md` (assets are reusable across tags; each row carries a `Tag` column marking the introducing tag).
+Per-tag (root, overwritten each `/gm-gdd`): `PLAN.md`, `STRUCTURE.md`, `SCENES.md`.
+Per-tag archives (immutable once sealed): `docs/tags/<tag>/`.
 
 ## Versioning
 

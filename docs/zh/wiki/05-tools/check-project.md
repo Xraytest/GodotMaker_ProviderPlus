@@ -1,6 +1,6 @@
 # 检查项目
 
-`check_project.py` 检查已生成的游戏项目，查找缺失文件、结构损坏及其他不一致问题。构建结果异常时，或在发布里程碑之前，都可以运行它。
+`check_project.py` 检查已生成的游戏项目，查找缺失文件、结构损坏及其他不一致问题。构建结果异常时，或在封口 tag 之前，都可以运行它。
 
 ```bash
 python tools/check_project.py /path/to/my-game

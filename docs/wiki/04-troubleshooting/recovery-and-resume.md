@@ -100,16 +100,16 @@ Most roles are safe to re-run. A few have restrictions:
 | Role | Re-runnable? | Notes |
 |------|-------------|-------|
 | `/gm-scaffold` | Once per project | Creates the Godot project structure and initial git commit. Running it again on an existing project will conflict with existing files. Do not re-run. |
-| `/gm-gdd` | Yes | Re-interviews you and rewrites planning docs. Use this at the start of each new milestone. |
+| `/gm-gdd` | Yes | Re-interviews you and rewrites planning docs. Use this at the start of each new tag. |
 | `/gm-asset` | Yes | Skips assets already present; only generates missing ones. |
 | `/gm-build` | Yes | Resumes from the current `PLAN.md` state. |
 | `/gm-verify` | Yes | Mechanical check; always safe to re-run. |
 | `/gm-evaluate` | Yes | Overwrites `evaluation.json` with fresh results. |
 | `/gm-fixgap` | Yes | Each run creates a new iteration under `.godotmaker/gaps/<n>/`. |
 | `/gm-accept` | Yes | Shows current results and asks again. |
-| `/gm-finalize` | Yes | Archives the milestone; safe to re-run if something was missed the first time. |
+| `/gm-finalize` | Once per tag | Archives the tag's working docs and runs `git tag <Tag>`. Re-running on a sealed tag fails because the git tag already exists — if finalize was interrupted before sealing, run it once more; if you want to amend a sealed tag, open a new tag instead. |
 
-After `/gm-finalize`, the next milestone begins with `/gm-gdd` (not `/gm-scaffold`).
+After `/gm-finalize`, the next tag begins with `/gm-gdd` (not `/gm-scaffold`).
 
 ---
 
