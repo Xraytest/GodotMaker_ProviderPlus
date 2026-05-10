@@ -18,6 +18,7 @@ from publish import (
     create_godotmaker_yaml,
     create_project_config,
     ensure_gitignore,
+    ensure_worktreeinclude,
     publish_skills,
     rmtree_force,
     _verify_godot_path,
@@ -305,6 +306,63 @@ class TestEnsureGitignore:
             assert entry in content
 
 
+WORKTREEINCLUDE_ENTRIES = [".claude/", "!.claude/worktrees/"]
+
+
+class TestEnsureWorktreeinclude:
+    """`.worktreeinclude` carries `.claude/` (godotmaker.yaml + skills/) into
+    sub-agent worktrees. Without it, sub-agents dispatched with
+    `isolation: "worktree"` see only git-tracked files and miss host config.
+    See https://code.claude.com/docs/en/worktrees.
+    """
+
+    def test_creates_new_file(self, tmp_path):
+        ensure_worktreeinclude(tmp_path)
+        wt = tmp_path / ".worktreeinclude"
+        assert wt.exists()
+        content = wt.read_text(encoding="utf-8")
+        for entry in WORKTREEINCLUDE_ENTRIES:
+            assert entry in content
+        # Header should explain WHY the file exists.
+        assert "worktree" in content.lower()
+
+    def test_appends_missing_entries(self, tmp_path):
+        wt = tmp_path / ".worktreeinclude"
+        wt.write_text("# user-managed\nsome/custom/path\n", encoding="utf-8")
+        ensure_worktreeinclude(tmp_path)
+        content = wt.read_text(encoding="utf-8")
+        # User content preserved
+        assert "some/custom/path" in content
+        assert "# user-managed" in content
+        # Required entries appended
+        for entry in WORKTREEINCLUDE_ENTRIES:
+            assert entry in content
+
+    def test_idempotent_when_already_present(self, tmp_path):
+        wt = tmp_path / ".worktreeinclude"
+        wt.write_text("\n".join(WORKTREEINCLUDE_ENTRIES) + "\n",
+                      encoding="utf-8")
+        ensure_worktreeinclude(tmp_path)
+        content = wt.read_text(encoding="utf-8")
+        # Each entry appears exactly once as a standalone line.
+        # (substring count would double-count: ".claude/" is a substring
+        # of "!.claude/worktrees/".)
+        lines = [line.strip() for line in content.splitlines()]
+        for entry in WORKTREEINCLUDE_ENTRIES:
+            assert lines.count(entry) == 1
+
+    def test_partial_missing(self, tmp_path):
+        wt = tmp_path / ".worktreeinclude"
+        wt.write_text(".claude/\n", encoding="utf-8")
+        ensure_worktreeinclude(tmp_path)
+        content = wt.read_text(encoding="utf-8")
+        lines = [line.strip() for line in content.splitlines()]
+        # The negation entry was missing; should be appended.
+        assert "!.claude/worktrees/" in lines
+        # The pre-existing entry should not be duplicated.
+        assert lines.count(".claude/") == 1
+
+
 class TestPublishSkills:
     def _make_repo(self, tmp_path):
         """Create a minimal repo structure with fake skills."""
@@ -440,7 +498,7 @@ class TestPublishMainForceRmtree:
             "deploy_settings", "deploy_claude_md", "create_godotmaker_yaml",
             "create_project_config", "deploy_stage_schemas",
             "create_project_dirs", "register_mcp", "ensure_gitignore",
-            "ensure_git_repo", "write_target_version",
+            "ensure_worktreeinclude", "ensure_git_repo", "write_target_version",
         ):
             monkeypatch.setattr(publish, name, _no_op)
         # Migration entry points must be truthy — main() exits 1 on falsy run.

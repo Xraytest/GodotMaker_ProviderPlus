@@ -614,6 +614,59 @@ def ensure_gitignore(target: Path):
         print("Created .gitignore")
 
 
+def ensure_worktreeinclude(target: Path):
+    """Ensure `.worktreeinclude` carries `.claude/` into sub-agent worktrees.
+
+    Sub-agents dispatched with `isolation: "worktree"` get a fresh git
+    checkout that contains only git-tracked files. `.claude/` is fully
+    gitignored (host-specific config + deployed skills, never committed),
+    so workers in worktrees couldn't read `.claude/godotmaker.yaml` (the
+    `godot_path` source of truth that gm-verify / gm-evaluate / gm-finalize
+    SKILLs depend on) or `.claude/skills/` (the SKILL files themselves).
+    Without carry-over, every sub-agent dispatched into a worktree fell
+    back to scanning PATH for godot, often picking the wrong binary.
+
+    Anthropic ships `.worktreeinclude` (gitignore syntax) at project root
+    as the documented mechanism for this carry-over. See
+    https://code.claude.com/docs/en/worktrees.
+
+    `.claude/worktrees/` is excluded so a sub-agent already running inside
+    a worktree doesn't try to recursively carry-over its own siblings.
+    """
+    worktreeinclude = target / ".worktreeinclude"
+
+    entries_needed = [
+        ".claude/",
+        "!.claude/worktrees/",
+    ]
+    header = (
+        "# Carry-over rules for sub-agent worktrees (gitignore syntax).\n"
+        "# Sub-agents dispatched with isolation: \"worktree\" need .claude/\n"
+        "# (godotmaker.yaml + skills/ + agents/) in their fresh checkout.\n"
+        "# See https://code.claude.com/docs/en/worktrees.\n"
+        "# Managed by tools/publish.py — your additions are preserved.\n"
+    )
+
+    if worktreeinclude.exists():
+        content = worktreeinclude.read_text(encoding="utf-8", errors="replace")
+        lines = content.splitlines()
+        line_set = set(line.strip() for line in lines)
+
+        missing = [e for e in entries_needed if e not in line_set]
+        if missing:
+            for entry in missing:
+                lines.append(entry)
+            worktreeinclude.write_text("\n".join(lines) + "\n",
+                                       encoding="utf-8")
+            print(f"Updated .worktreeinclude (added: {', '.join(missing)})")
+    else:
+        worktreeinclude.write_text(
+            header + "\n" + "\n".join(entries_needed) + "\n",
+            encoding="utf-8",
+        )
+        print("Created .worktreeinclude (sub-agent worktree carry-over)")
+
+
 # ── Main ───────────────────────────────────────────────────────
 
 
@@ -702,6 +755,12 @@ def main():
 
     # Ensure .gitignore
     ensure_gitignore(target)
+
+    # Ensure .worktreeinclude carries .claude/ into sub-agent worktrees.
+    # Must run after ensure_gitignore (so .claude/ is properly ignored from
+    # main tree) and before ensure_git_repo's initial commit (so the file
+    # is tracked from the start).
+    ensure_worktreeinclude(target)
 
     # Initialize git repo with initial commit (required for worktree isolation)
     ensure_git_repo(target)
