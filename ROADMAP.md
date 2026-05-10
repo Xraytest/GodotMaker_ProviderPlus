@@ -76,6 +76,7 @@ Items below are ideas under consideration — not committed to a timeline.
 - `R-109` **GDD quality review** — Automated completeness and consistency checks on generated Game Design Documents.
 - `R-110` **Android build workflow** — APK/AAB export with signing, versioning, and store-ready packaging.
 - `R-111` **Sprite sheet animation pipeline** — Generate multi-frame sprite sheets from single-frame AI-generated sprites.
+- `R-112` **Re-evaluate gdtoolkit (gdlint / gdformat)** *(low priority)* — Disabled in v0.3.4 due to recurring `gdtoolkit/linter/class_checks.py:144 NotImplementedError` crashes on ECS-style class shapes. Rationale + restore guide in [`docs/decisions/disable-gdtoolkit.md`](docs/decisions/disable-gdtoolkit.md).
 
 ## Contributing
 

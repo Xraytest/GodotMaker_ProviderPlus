@@ -40,7 +40,6 @@ Supporting skills are reference packs loaded silently by the role skills. You ne
 |-------|-----------------|-----------|
 | `godot-api` | Godot 4 engine class documentation — methods, properties, signals, and enums | `/gm-build`, `/gm-fixgap` |
 | `gecs` | API reference for the gecs ECS addon (Entity, Component, System, World, QueryBuilder) | `/gm-build`, `/gm-fixgap` |
-| `gdtoolkit` | How to run `gdlint` and `gdformat` to lint and format GDScript files | `/gm-verify` |
 
 ### Building and running
 

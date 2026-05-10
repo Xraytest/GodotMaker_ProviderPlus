@@ -37,15 +37,3 @@ jobs:
           cache: pip
       - run: pip install pytest
       - run: pytest --tb=short
-
-  lint-gdscript:
-    name: Lint GDScript
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-      - run: pip install gdtoolkit
-      - run: gdlint .

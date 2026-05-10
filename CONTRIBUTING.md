@@ -27,9 +27,6 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 4. **Run benchmarks** — you must verify your changes do not regress performance before submitting. Include benchmark results in the PR description.
 5. Run the full validation pipeline locally:
    ```bash
-   # Lint GDScript
-   gdlint .
-
    # Run tests
    pytest
    godot --headless -s addons/gdunit4/bin/gdunit4_run.gd

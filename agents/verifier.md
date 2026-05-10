@@ -134,18 +134,11 @@ godot-e2e e2e/ -v
 ```
 Report: scenarios passed / failed. Each failure: scenario name, step that failed.
 
-### Lint
-```bash
-gdlint .
-gdformat --check .
-```
-Report: error count, first 5 errors with file:line.
-
 ### Static Check
 ```bash
-python tools/check_project.py <project_dir> --all
+python tools/check_project.py <project_dir> --build --ecs --tests --plan --mcp
 ```
-Report: each check line (PASS/FAIL).
+Report: each check line (PASS/FAIL). `--all` is intentionally not used: it adds `--e2e`, which gates the Evaluator's territory (e2e tests are written/maintained during `/gm-evaluate`, AFTER verify). Including it would phantom-fail every first verify of a fresh tag.
 
 ### Visual QA
 Use godot-e2e `game.screenshot()` to capture screenshots (NOT external screenshot tools).

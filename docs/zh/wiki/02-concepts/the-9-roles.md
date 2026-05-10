@@ -91,8 +91,7 @@
 **背后发生了什么：**
 - 无界面运行 Godot 构建，检查编译错误
 - 通过 `gdUnit4` 运行 `tests/` 里的所有单元测试
-- 跑 `gdlint` 和 `gdformat --check` 做风格检查
-- 通过 `tools/check_project.py --all` 跑静态项目检查
+- 通过 `tools/check_project.py` 跑静态项目检查（build/ecs/tests/plan/mcp 五项；e2e 检查归 Evaluator 阶段）
 - 把结构化结论写入 `.godotmaker/verify_report.json`（每次都写，无论 PASS 还是 FAIL）
 
 **你得到什么：** 两份产出——一份给人看的对话内验证报告，以及 `.godotmaker/verify_report.json` 同等信息的结构化版本。全部通过时，`/gm-verify` 还会向 `.godotmaker/stage.jsonl` 追加一个 `verify` 事件。

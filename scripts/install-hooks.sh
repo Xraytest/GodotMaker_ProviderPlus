@@ -37,7 +37,7 @@ else
     echo "  Install: https://github.com/gitleaks-io/gitleaks#installing"
 fi
 
-# Install pre-push hook (CI-equivalent checks: ruff + pytest + gdlint)
+# Install pre-push hook (CI-equivalent checks: ruff + pytest)
 PREPUSH_SRC="$REPO_ROOT/scripts/pre-push"
 PREPUSH_DST="$HOOKS_DIR/pre-push"
 
@@ -47,6 +47,6 @@ if [ -f "$PREPUSH_DST" ] && [ ! -L "$PREPUSH_DST" ]; then
 fi
 
 ln -sf ../../scripts/pre-push "$PREPUSH_DST"
-echo "  Installed pre-push hook as symlink (CI-equivalent: ruff + pytest + gdlint)"
+echo "  Installed pre-push hook as symlink (CI-equivalent: ruff + pytest)"
 
 echo "Done. Git hooks installed successfully."

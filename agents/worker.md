@@ -128,5 +128,4 @@ When your brief references a skill, read its SKILL.md. All skills at `.claude/sk
 - `godot-api` — Godot API lookup (version-aware)
 - `headless-build` — Compilation verification
 - `gdunit-driver` — Test execution
-- `gdtoolkit` — Lint and format
 - `physics`, `ui`, `animation`, etc. — Domain-specific gotchas

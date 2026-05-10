@@ -32,4 +32,5 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Removed
 
+- **gdtoolkit (gdlint + gdformat) disabled across the pipeline.** Recurring `gdtoolkit/linter/class_checks.py:144 NotImplementedError` crashes on ECS-style class shapes had zero project-code signal — value is style consistency only. `verify_report.json` lint schema preserved so consumers don't need to special-case. Tracked as ROADMAP `R-112`; rationale + restore guide in [`docs/decisions/disable-gdtoolkit.md`](docs/decisions/disable-gdtoolkit.md). — @LiuXin
 - **Stale `--all` e2e gating in `gm-verify` static check.** `python tools/check_project.py --all` replaced with `--build --ecs --tests --plan --mcp`. The `e2e/` suite is owned by the Evaluator (per `gm-build` Hard Rule 2 / `gm-evaluate` Phase 2); gating it during verify caused phantom failures on every fresh tag's first verify. — @LiuXin

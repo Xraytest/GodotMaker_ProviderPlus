@@ -40,7 +40,6 @@ Core 技能分为两类：九个通过斜杠命令调用的角色技能，以及
 |------|-----------|----------|
 | `godot-api` | Godot 4 引擎类文档——方法、属性、信号和枚举 | `/gm-build`、`/gm-fixgap` |
 | `gecs` | gecs ECS 插件的 API 参考（Entity、Component、System、World、QueryBuilder） | `/gm-build`、`/gm-fixgap` |
-| `gdtoolkit` | 如何运行 `gdlint` 和 `gdformat` 对 GDScript 文件进行静态检查和格式化 | `/gm-verify` |
 
 ### 构建与运行类
 

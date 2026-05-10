@@ -30,12 +30,4 @@ else
     echo "[pre-push] Skipping tests."
 fi
 
-# 3. gdlint (mirrors CI lint-gdscript) — optional, skip if not installed
-if command -v gdlint &> /dev/null; then
-    echo "[pre-push] -> gdlint ."
-    gdlint .
-else
-    echo "[pre-push] (gdlint not installed; skipping GDScript lint — install: pip install gdtoolkit)"
-fi
-
 echo "[pre-push] All checks passed."

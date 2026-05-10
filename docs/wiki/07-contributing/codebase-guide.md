@@ -101,7 +101,7 @@ Role skills and supporting skills, one directory per skill. Each directory conta
 
 **Role skills (9):** `gm-scaffold`, `gm-gdd`, `gm-asset`, `gm-build`, `gm-verify`, `gm-evaluate`, `gm-fixgap`, `gm-accept`, `gm-finalize`. These map 1:1 to the `/gm-*` slash commands. Each role skill writes its role name to `.godotmaker/current_role` as its first action, which is what `check_file_permissions.py` reads to enforce write rules.
 
-**Supporting skills (12):** `game-planner`, `project-scaffold`, `godot-api`, `gecs`, `input-mapper`, `headless-build`, `gdunit-driver`, `godot-e2e`, `gdtoolkit`, `visual-qa`, `screenshot`, `mcp-driver`. These are reference documents loaded by role skills — users do not invoke them directly.
+**Supporting skills (11):** `game-planner`, `project-scaffold`, `godot-api`, `gecs`, `input-mapper`, `headless-build`, `gdunit-driver`, `godot-e2e`, `visual-qa`, `screenshot`, `mcp-driver`. These are reference documents loaded by role skills — users do not invoke them directly.
 
 ### skills/core/_shared/
 

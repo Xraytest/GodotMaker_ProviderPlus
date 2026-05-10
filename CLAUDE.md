@@ -64,7 +64,7 @@ python tools/check_env.py
 - **Layer 1 — Core**:
   - **9 pipeline skills** (run in tag iteration): `gm-scaffold` (once), then per tag: `gm-gdd → gm-asset → gm-build → gm-verify → gm-evaluate → gm-fixgap (loop) → gm-accept → gm-finalize`
   - **1 out-of-pipeline skill**: `gm-rescue` — diagnostic-only, invoked manually when the pipeline is stuck; checks whether the blockage is a godotmaker defect; never modifies game code
-  - **Supporting skills**: game-planner, project-scaffold, godot-api, gecs, input-mapper, headless-build, gdunit-driver, godot-e2e, gdtoolkit, visual-qa, screenshot, mcp-driver
+  - **Supporting skills**: game-planner, project-scaffold, godot-api, gecs, input-mapper, headless-build, gdunit-driver, godot-e2e, visual-qa, screenshot, mcp-driver
 - **Layer 2 — Reviewer** (8 skills): physics, animation, ui, tilemap, navigation, shader, audio, particles — each has SKILL.md + gotchas.md + checklist.md
 - **Layer 3 — Pattern**: per game genre (deferred)
 

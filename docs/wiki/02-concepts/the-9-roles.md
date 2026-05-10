@@ -91,8 +91,7 @@ The pipeline runs **per tag** (SemVer: v0.1.0, v0.2.0, …). One full pass throu
 **What happens behind the scenes:**
 - Runs the Godot headless build to check for compile errors
 - Runs all unit tests in `tests/` via `gdUnit4`
-- Runs `gdlint` and `gdformat --check` for style
-- Runs the static project check via `tools/check_project.py --all`
+- Runs the static project check via `tools/check_project.py` (build/ecs/tests/plan/mcp; e2e gating is the Evaluator's job)
 - Writes the structured verdict to `.godotmaker/verify_report.json` (every run, pass or fail)
 
 **What you get:** Two outputs — a chat-readable verification report you can scan, and `.godotmaker/verify_report.json` with the same information in a structured form. On success, `/gm-verify` also appends a `verify` event to `.godotmaker/stage.jsonl`.

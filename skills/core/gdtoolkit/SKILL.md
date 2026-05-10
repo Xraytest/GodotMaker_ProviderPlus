@@ -10,6 +10,15 @@ description: |
 
 # gdtoolkit — GDScript Lint & Format
 
+> **Currently disabled (v0.3.4+).** `gm-verify` no longer invokes
+> `gdlint` / `gdformat`, and `gm-build` / `gm-fixgap` have removed this
+> skill from their Available Skills tables. Reason: repeated
+> `gdtoolkit/linter/class_checks.py:144 NotImplementedError` crashes on
+> common ECS-style GDScript class shapes, plus low signal-to-noise vs
+> the headless compile + reviewer pattern checks. Re-enabling tracked as
+> ROADMAP `R-112`. The reference content below is preserved for ad-hoc
+> use outside the pipeline and for the future re-enablement.
+
 Wraps two CLI tools from the `gdtoolkit` Python package:
 - **gdlint** — static analysis and style checking
 - **gdformat** — deterministic auto-formatter

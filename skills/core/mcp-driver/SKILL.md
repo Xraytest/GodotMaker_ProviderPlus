@@ -9,7 +9,7 @@ description: |
   gdunit-driver), or the issue is inherently runtime-only (visual glitches, input not
   responding, physics behaving unexpectedly at runtime).
   DO NOT use for: syntax/compile errors (use headless-build), unit test failures
-  (use gdunit-driver), style/lint issues (use gdtoolkit), API lookups (use godot-api).
+  (use gdunit-driver), API lookups (use godot-api).
   Requires: godot-mcp MCP server registered as "godot" (@coding-solo/godot-mcp).
 ---
 
@@ -25,7 +25,6 @@ MCP is the **upgrade path** when faster tools hit a wall. The fast loop handles 
 |---|---|
 | Syntax / parse error | headless-build |
 | Unit test failure | gdunit-driver |
-| Lint / formatting | gdtoolkit |
 | API lookup | godot-api |
 
 Escalate to MCP when:

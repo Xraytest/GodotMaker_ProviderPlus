@@ -207,7 +207,6 @@ memory/
 | gecs | ECS framework API + patterns | .claude/skills/gecs/SKILL.md |
 | headless-build | Compile verification | .claude/skills/headless-build/SKILL.md |
 | gdunit-driver | Unit test execution | .claude/skills/gdunit-driver/SKILL.md |
-| gdtoolkit | GDScript lint + format | .claude/skills/gdtoolkit/SKILL.md |
 | godot-api | Godot API reference | .claude/skills/godot-api/SKILL.md |
 | screenshot | Gameplay screenshot capture | .claude/skills/screenshot/SKILL.md |
 | mcp-driver | Runtime debugging via godot-mcp | .claude/skills/mcp-driver/SKILL.md |
