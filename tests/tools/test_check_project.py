@@ -234,6 +234,108 @@ class TestPlanCheck:
         assert "[PASS]" in stdout
 
 
+class TestE2eCheckFallback:
+    """`check_e2e()` falls back to scanning the project for files whose
+    path contains "e2e" / "end_to_end" / "integration_test" when
+    `e2e/test_*.py` is empty (legacy projects that put e2e tests
+    elsewhere). Two filters layered on top of the path match: skip
+    pytest infrastructure (`conftest.py` / `__init__.py`), and require
+    `test_*.py` / `*_test.py` naming so helper modules sharing the path
+    aren't reported as e2e tests with "no test functions".
+
+    Fallback fires only when `e2e/test_*.py` is empty — every test here
+    creates `e2e/conftest.py` (so the standard-location-conftest check
+    passes) but leaves `e2e/` without `test_*.py`, then plants a decoy
+    elsewhere to exercise the filters."""
+
+    def _seed_e2e_capable_project(self, project_dir: str):
+        """Minimal project.godot + addons/godot_e2e/ + e2e/conftest.py
+        so check_e2e()'s plugin / standard-conftest checks pass and the
+        fallback runs."""
+        with open(os.path.join(project_dir, "project.godot"), "w", encoding="utf-8") as f:
+            f.write(
+                'config_version=5\n[application]\nconfig/name="Test"\n\n'
+                '[editor_plugins]\nenabled=PackedStringArray('
+                '"res://addons/godot_e2e/plugin.cfg")\n'
+            )
+        os.makedirs(os.path.join(project_dir, "addons", "godot_e2e"))
+        os.makedirs(os.path.join(project_dir, "e2e"))
+        with open(os.path.join(project_dir, "e2e", "conftest.py"), "w", encoding="utf-8") as f:
+            f.write("from godot_e2e import GodotE2E\n")
+
+    def test_conftest_in_legacy_e2e_path_no_phantom_fail(self, project_dir):
+        """`e2e/conftest.py` (a pytest infrastructure file) must not be
+        misclassified as an e2e test and then failed for "no test
+        functions" — the historical regression that motivated this guard.
+        The legitimate "No e2e test files found in e2e/" FAIL is still
+        emitted; only the phantom conftest FAIL is gone."""
+        self._seed_e2e_capable_project(project_dir)
+        # Decoy: a SECOND conftest.py at a legacy e2e location. The
+        # standard-location one (e2e/conftest.py) is also a candidate
+        # but the dual-path planting hardens the test against rglob
+        # ordering quirks.
+        legacy = os.path.join(project_dir, "tests", "e2e")
+        os.makedirs(legacy)
+        with open(os.path.join(legacy, "conftest.py"), "w", encoding="utf-8") as f:
+            f.write("# legacy conftest\n")
+
+        stdout, _ = run_check(project_dir, "--e2e")
+        assert "conftest.py has no test functions" not in stdout
+        assert "conftest.py is too short" not in stdout
+
+    def test_init_py_in_legacy_e2e_path_not_misclassified(self, project_dir):
+        """`__init__.py` is package metadata, not a test — must be skipped
+        by the fallback."""
+        self._seed_e2e_capable_project(project_dir)
+        legacy = os.path.join(project_dir, "tests", "e2e")
+        os.makedirs(legacy)
+        with open(os.path.join(legacy, "__init__.py"), "w", encoding="utf-8") as f:
+            f.write("")
+
+        stdout, _ = run_check(project_dir, "--e2e")
+        assert "__init__.py has no test functions" not in stdout
+        assert "__init__.py is too short" not in stdout
+
+    def test_helper_module_in_legacy_e2e_path_not_misclassified(self, project_dir):
+        """A helper module (fixtures.py / utils.py / …) sharing the path
+        with "e2e" must not be misclassified as an e2e test by the
+        fallback — it lacks the `test_*` / `*_test` naming and stays out
+        of `e2e_files`."""
+        self._seed_e2e_capable_project(project_dir)
+        legacy = os.path.join(project_dir, "tests", "e2e")
+        os.makedirs(legacy)
+        with open(os.path.join(legacy, "fixtures.py"), "w", encoding="utf-8") as f:
+            f.write(
+                "# Substantial enough that the 'too short' rule wouldn't\n"
+                "# fire if this were misclassified — the assertion below\n"
+                "# guards specifically against the misclassification.\n"
+                "def make_player():\n"
+                "    return {'hp': 100}\n"
+            )
+
+        stdout, _ = run_check(project_dir, "--e2e")
+        assert "fixtures.py has no test functions" not in stdout
+        assert "fixtures.py is too short" not in stdout
+
+    def test_legacy_test_file_still_picked_up(self, project_dir):
+        """Regression guard for the positive path: a properly-named legacy
+        e2e test (`test_*.py` under a path containing "e2e") is still
+        matched by the fallback after the filter additions."""
+        self._seed_e2e_capable_project(project_dir)
+        legacy = os.path.join(project_dir, "tests", "e2e")
+        os.makedirs(legacy)
+        with open(os.path.join(legacy, "test_smoke.py"), "w", encoding="utf-8") as f:
+            f.write(
+                "from godot_e2e import GodotE2E\n"
+                "def test_smoke(game):\n"
+                "    assert game is not None\n"
+            )
+
+        stdout, _ = run_check(project_dir, "--e2e")
+        assert "test_smoke.py" in stdout
+        assert "No e2e test files found in e2e/" not in stdout
+
+
 class TestAllCheck:
     def test_empty_project_fails(self, project_dir):
         stdout, code = run_check(project_dir, "--all")

@@ -53,9 +53,11 @@ Criteria: no errors (warnings acceptable).
 
 ### 4. Static Check
 ```bash
-python tools/check_project.py <project_dir> --all
+python tools/check_project.py <project_dir> --build --ecs --tests --plan --mcp
 ```
 Criteria: no FAIL lines.
+
+**Why not `--all`:** `--all` adds `--e2e`, which is the Evaluator's territory — verify must not gate it.
 
 ## Output Format
 
@@ -82,7 +84,7 @@ Result: PASS | WARN | FAIL
 Output: {summary}
 
 ### Static Check
-Command: python tools/check_project.py <dir> --all
+Command: python tools/check_project.py <dir> --build --ecs --tests --plan --mcp
 Result: PASS | FAIL
 Output: {paste PASS/FAIL lines}
 

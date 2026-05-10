@@ -349,12 +349,23 @@ def check_e2e(project_dir: Path, result: CheckResult):
     if e2e_dir.exists():
         e2e_files = list(e2e_dir.glob("test_*.py"))
 
-    # Fallback: check legacy locations (files with "e2e" in path)
+    # Fallback: check legacy locations (files with "e2e" in path).
+    # Two filters layered on top of the path match:
+    #   - skip pytest infrastructure files (conftest.py, __init__.py) —
+    #     they sit in test directories but are not themselves tests
+    #   - require test_*.py / *_test.py naming so helper modules
+    #     (fixtures.py, utils.py, …) sharing a path with "e2e" are not
+    #     misclassified as e2e tests and then failed for "no test
+    #     functions"
     if not e2e_files:
         e2e_patterns = ["e2e", "end_to_end", "integration_test"]
         for py_file in project_dir.rglob("*.py"):
             rel = py_file.relative_to(project_dir)
             if any(p.startswith(".") or p in {"addons", "venv", "node_modules"} for p in rel.parts):
+                continue
+            if py_file.name in {"conftest.py", "__init__.py"}:
+                continue
+            if not (py_file.stem.startswith("test_") or py_file.stem.endswith("_test")):
                 continue
             if any(p in str(rel).lower() for p in e2e_patterns):
                 e2e_files.append(py_file)
