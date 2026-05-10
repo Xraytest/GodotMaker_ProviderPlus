@@ -5,14 +5,17 @@
 1. [Fixture Strategies](#fixture-strategies)
 2. [Physics-Based Testing](#physics-based-testing)
 3. [UI Testing](#ui-testing)
-4. [State Verification](#state-verification)
-5. [Scene Transition Testing](#scene-transition-testing)
-6. [Screenshot on Failure](#screenshot-on-failure)
-7. [Flaky Test Mitigation](#flaky-test-mitigation)
-8. [Batch Operations for Performance](#batch-operations-for-performance)
-9. [Debugging Tips](#debugging-tips)
-10. [CI Configuration](#ci-configuration)
-11. [Common Gotchas](#common-gotchas)
+4. [Locator-Based UI Testing](#locator-based-ui-testing)
+5. [expect()-Driven Assertions](#expect-driven-assertions)
+6. [Log Capture for Debugging](#log-capture-for-debugging)
+7. [State Verification](#state-verification)
+8. [Scene Transition Testing](#scene-transition-testing)
+9. [Screenshot on Failure](#screenshot-on-failure)
+10. [Flaky Test Mitigation](#flaky-test-mitigation)
+11. [Batch Operations for Performance](#batch-operations-for-performance)
+12. [Debugging Tips](#debugging-tips)
+13. [CI Configuration](#ci-configuration)
+14. [Common Gotchas](#common-gotchas)
 
 ---
 
@@ -184,6 +187,320 @@ def test_pause_menu_visibility(game):
     game.wait_process_frames(5)
     assert game.get_property("/root/Main/PauseMenu", "visible") == True
 ```
+
+> **For new code, prefer the Locator + `expect()` patterns below.**
+> They survive scene-tree restructuring (no hardcoded paths) and
+> replace manual `wait + assert` with structured retries. The
+> direct-API patterns above remain valid for code working from
+> stable raw paths (root-level singletons, autoloads).
+
+---
+
+## Locator-Based UI Testing
+
+`Locator` is lazy and re-resolves on every action. Use semantic
+queries (`group=`, `type=`, `text=`) instead of hardcoded paths so
+tests survive minor scene refactors.
+
+### Click a button by visible text
+
+```python
+def test_start_button_starts_game(game):
+    game.get_by_button("Start Game").click()  # auto-waits actionability
+    expect(game.locator(name="GameStatus")).to_have_text("Playing")
+```
+
+`get_by_button(text)` covers `Button`, `CheckBox`, `OptionButton`,
+`MenuButton`, `LinkButton` (anything `is BaseButton`).
+`Locator.click()` polls `is_visible_in_tree` + `mouse_filter` +
+viewport intersect for `Control` nodes; raises `NotActionableError`
+with structured `reasons` if never actionable.
+
+### Disambiguate ambiguous queries
+
+```python
+# RAW — would raise MultipleMatchesError on a screen with multiple buttons:
+# game.locator(type="Button").click()
+
+# Pick by index:
+game.locator(type="Button").first().click()
+game.locator(type="Button").nth(2).click()
+
+# Or filter:
+game.locator(type="Button").filter(text="OK").click()
+```
+
+### Iterate matched nodes
+
+```python
+def test_all_enemies_take_damage(game):
+    enemies = game.locator(group="enemies").all()
+    assert len(enemies) > 0, "no enemies in scene"
+    for enemy in enemies:
+        before = enemy.get_property("health")
+        enemy.call("take_damage", [10])
+        assert enemy.get_property("health") == before - 10
+```
+
+`.all()` returns a snapshot of path-pinned `Locator` instances —
+subsequent tree mutations don't update the list. Returns `[]` (no
+raise) when nothing matches.
+
+### Sub-queries (chained Locators)
+
+```python
+# Find a child by name within the player
+overlay = game.locator(group="player").locator(name="HealthBar")
+expect(overlay).to_be_visible()
+```
+
+The parent (`group="player"`) must resolve to exactly one node at
+action time — `MultipleMatchesError` propagates from action calls.
+`exists()` and `count()` swallow these and return `False` / `0`.
+
+### Wait for actionability without clicking
+
+```python
+def test_overlay_appears(game):
+    panel = game.locator(name="GameOverPanel")
+    game.set_property("/root/Main/Player", "health", 0)
+    panel.wait_visible(timeout=3.0)  # raises NotActionableError on timeout
+```
+
+`NotActionableError.reasons` lists which checks failed:
+`"not_visible_in_tree"`, `"mouse_filter_ignore"`,
+`"outside_viewport"`, `"unclickable_node_type"`.
+
+### When to keep raw paths
+
+Top-level singletons that aren't expected to move:
+```python
+game.wait_for_node("/root/Main", timeout=5.0)
+game.wait_for_property("/root/Main", "score", 10, timeout=5.0)
+```
+
+Reserve raw paths for `wait_for_node` (waiting for the entry-point
+scene), root-level autoloads, and one-off debugging. For all
+gameplay assertions, use Locator + `expect()`.
+
+---
+
+## expect()-Driven Assertions
+
+`expect(locator, *, timeout=5.0, poll_interval=0.05)` re-resolves the
+Locator on every poll. Lookup errors during polling
+(`NodeNotFoundError`, `MultipleMatchesError`, `CommandError`) are
+caught — the node may appear / disambiguate later.
+
+### Property equality
+
+```python
+expect(game.locator(group="player")).to_have_property("health", 100)
+```
+
+### Text assertion (sugar for `to_have_property("text", text)`)
+
+```python
+expect(game.locator(name="StatusLabel"), timeout=2.0).to_have_text("Ready")
+```
+
+### Visibility (Control / Node2D only)
+
+```python
+expect(game.locator(name="GameOverPanel")).to_be_visible()
+```
+
+For `Node3D` / `Window` / `Node`, fall back to `to_satisfy`:
+```python
+expect(game.locator(name="Cube3D")).to_satisfy(
+    lambda l: l.get_property("visible"),
+    description="Cube3D visible",
+)
+```
+
+### Existence (≥1 match — count NOT required to be 1)
+
+```python
+expect(game.locator(group="enemies")).to_exist()
+```
+
+### Custom predicates with description
+
+```python
+def test_player_crosses_threshold(game):
+    player = game.locator(group="player")
+    initial_x = player.get_property("position:x")
+
+    game.input_action("ui_right", True)
+    game.wait_physics_frames(20)
+    game.input_action("ui_right", False)
+
+    expect(player, timeout=3.0).to_satisfy(
+        lambda l: l.get_property("position:x") > initial_x + 100,
+        description=f"player moved past x={initial_x + 100}",
+    )
+```
+
+`description=` is the human-readable matcher name in failure
+messages. Without it, the matcher reports `repr(predicate)`, which is
+useless for lambdas. Always pass `description=` for `to_satisfy`.
+
+### Per-call timeout override
+
+```python
+# Default 5.0s
+expect(panel).to_be_visible()
+
+# Tight timeout for fast-changing UI
+expect(label, timeout=0.5).to_have_text("Ready")
+
+# Long timeout for level-load assertions
+expect(game.locator(name="Level2"), timeout=15.0).to_exist()
+```
+
+### When `expect()` fails — diagnosing `ExpectationFailedError`
+
+```python
+from godot_e2e import ExpectationFailedError
+
+try:
+    expect(game.locator(name="StatusLabel"), timeout=2.0).to_have_text("Ready")
+except ExpectationFailedError as e:
+    print(f"matcher={e.matcher} actual={e.actual!r} observed={e.observation_captured}")
+    print(f"timeout={e.timeout}")
+    if e.last_error is not None:
+        print(f"last swallowed CommandError: {e.last_error}")
+    if e.scene_tree is not None:
+        import json
+        print("scene tree at failure:", json.dumps(e.scene_tree, indent=2))
+    if e.logs:
+        print("godot logs during polling:", [str(x) for x in e.logs])
+    raise
+```
+
+`ExpectationFailedError` dual-inherits `AssertionError`, so pytest
+renders it in the assertion section of the report (not as a generic
+exception traceback).
+
+### `expect()` vs `wait_for_property + assert`
+
+```python
+# Direct-API form — fine when you only have a raw path
+game.wait_for_property("/root/Main/Player", "health", 0, timeout=3.0)
+assert game.get_property("/root/Main/Player", "health") == 0
+
+# Locator form — single retry-with-context
+expect(game.locator(group="player"), timeout=3.0).to_have_property("health", 0)
+```
+
+The Locator form re-resolves on each poll (so works after
+`reload_scene()`), provides `scene_tree` + `last_error` in the
+failure message, and renders as a normal pytest assertion. Pick
+based on whether you have a Locator handle in scope, not by default.
+
+---
+
+## Log Capture for Debugging
+
+Every `GodotE2EError` carries `.logs` (list of `LogEntry`) populated
+from the failing command's response. Pytest auto-includes a
+`captured godot logs` section on failure — no setup needed.
+`game.collected_logs` is reset by built-in fixtures at test entry, so
+it reflects the current test only.
+
+### Assert no errors during a test
+
+```python
+def test_button_click_quietly(game):
+    game.get_by_button("OK").click()
+    expect(game.locator(name="Status")).to_have_text("done")
+
+    errors = [e for e in game.collected_logs if e.level == "error"]
+    assert not errors, f"unexpected errors: {[str(e) for e in errors]}"
+```
+
+### Assert a specific warning was raised
+
+```python
+def test_dangerous_call_warns(game):
+    game.reset_collected_logs()  # narrow window to this command
+    game.call("/root/Main", "trigger_dangerous_thing")
+
+    warning_msgs = [e.message for e in game.last_logs if e.level == "warning"]
+    assert any("about to do dangerous thing" in m for m in warning_msgs), \
+        f"missing expected warning; got: {warning_msgs}"
+```
+
+`last_logs` is cleared on every command — use it for assertions about
+a single command. Use `collected_logs` for whole-test assertions.
+
+### Bump verbosity to capture print() output
+
+```python
+from godot_e2e import GodotE2E
+
+with GodotE2E.launch("./project", log_verbosity="info") as game:
+    # ... `print()` and `printerr()` from gameplay are now captured
+    game.call("/root/Main", "noisy_method")
+    info_lines = [e for e in game.last_logs if e.level == "info"]
+    assert any("expected info" in e.message for e in info_lines)
+```
+
+Default verbosity `"warning"` captures `push_error` and `push_warning`
+only. `"info"` adds `print()` (level `"info"`) and `printerr()` (level
+`"stderr"`); buffer fills 4-10× faster.
+
+### Runtime verbosity changes
+
+```python
+def test_specific_section(game):
+    game.set_log_verbosity("info")
+    try:
+        game.call("/root/Main", "verbose_section")
+        # assert on info-level logs
+    finally:
+        game.set_log_verbosity("warning")
+```
+
+### Inspect logs from a failed exception
+
+```python
+from godot_e2e import GodotE2EError
+
+def test_handles_missing_node(game):
+    try:
+        game.set_property("/root/MissingNode", "health", 0)
+    except GodotE2EError as e:
+        # Even on lookup failure, e.logs may have engine warnings
+        engine_warnings = [x for x in e.logs if x.level == "warning"]
+        assert not engine_warnings or "deprecated" not in engine_warnings[0].message
+        raise
+```
+
+### Buffer overflow
+
+If many errors fire between drains, the ring buffer (default 200)
+overflows. The Python client synthesizes a single warning entry:
+```
+LogEntry(level="warning", message="<N log entries dropped due to capture buffer overflow>", ...)
+```
+appended to `last_logs`, `collected_logs`, and exception `.logs`.
+Resize at runtime with `game.set_log_buffer_size(1000)`.
+
+### When to NOT log-assert
+
+Log assertions are powerful but can be brittle if the engine's log
+phrasing changes. Don't anchor tests on:
+- exact GDScript runtime error strings (Godot version-sensitive)
+- log line counts (timing-sensitive)
+- warnings from third-party addons (gecs, gdunit4, etc. may emit
+  routine warnings unrelated to your code)
+
+Anchor instead on:
+- presence/absence of `level == "error"` entries (the generic "no
+  errors during this test" assertion is the sweet spot)
+- specific game-code messages (matched by substring, not exact equality)
+- warnings tied to your own `push_warning("foo")` calls
 
 ---
 

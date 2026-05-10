@@ -21,6 +21,8 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Changed
 
+- **`godot-e2e` SKILL synced to upstream v1.2.0** — adds `Locator` (semantic node queries), `expect(locator)` auto-retry assertions, and engine log capture (`GodotE2EError.logs`). Projects on Godot 4.3 / 4.4 stay on godot-e2e v1.1.0 per `config/addon_versions.json` — older SKILL revision required, do not mix. — @LiuXin
+
 ## Fixed
 
 - **`gm-verify`, `gm-evaluate`, `gm-finalize` assumed `godot` was on `PATH`.** Each SKILL now reads `godot_path` from `.claude/godotmaker.yaml` (written by `tools/publish.py` at first install) and substitutes it for `<godot_path>` in every `godot --headless …` command. Falls back to plain `godot` if the field is missing; STOPs and asks for re-publish if both fail. — @LiuXin
