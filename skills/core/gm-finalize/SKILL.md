@@ -170,7 +170,7 @@ This step MUST run before step 9: the `finalize` schema declares `final_report.j
 
 ### 9. Append finalize event
 
-Append a line to `.godotmaker/stage.jsonl`: `{"role": "finalize", "ts": "<UTC ISO timestamp>", "tag": "<Tag>"}`. Read the existing file (treat as empty if missing — step 7 truncated it), append, write back.
+From the project root run `python tools/append_stage_event.py finalize --tag=<Tag>` to append a `{"role": "finalize", "ts": "<server-generated UTC>", "tag": "<Tag>"}` line to `.godotmaker/stage.jsonl`. Do NOT hand-write the JSON or the timestamp — the helper exists so the timestamp comes from the system clock, not your own output.
 
 > Note: this re-creates `stage.jsonl` after step 7 truncated it. The single finalize event is the only thing that lives in the new tag's stage.jsonl until /gm-gdd subsequent-mode adds its own event.
 

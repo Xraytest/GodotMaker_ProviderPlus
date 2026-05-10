@@ -108,13 +108,13 @@ Do NOT proceed until the user replies. Their reply drives the When Done branch b
 
 ## When Done
 
-Always append a trace event to `.godotmaker/stage.jsonl` recording the user's decision, regardless of which branch was chosen:
+Always append a trace event to `.godotmaker/stage.jsonl` recording the user's decision, regardless of which branch was chosen. From the project root run:
 
 ```
-{"role": "accept", "ts": "<UTC ISO timestamp>", "decision": "<accept|fix|done>"}
+python tools/append_stage_event.py accept --decision=<accept|fix|done>
 ```
 
-(Read the existing file, append the new event, write the full file back.)
+This appends a `{"role": "accept", "ts": "<server-generated UTC>", "decision": "<accept|fix|done>"}` line. Do NOT hand-write the JSON or the timestamp — the helper exists so the timestamp comes from the system clock, not your own output.
 
 Then, based on the decision:
 - **accept** → Inform the user: `Accepted. Recommended next: /gm-finalize`

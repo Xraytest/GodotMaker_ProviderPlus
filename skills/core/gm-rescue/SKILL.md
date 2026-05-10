@@ -183,5 +183,5 @@ Do not loop, do not retry under a different framing, do not switch hypotheses mi
 
 After delivering the diagnosis chat message:
 
-1. Append a line to `.godotmaker/stage.jsonl`: `{"role": "rescue", "ts": "<UTC ISO timestamp>", "conclusion": "<defect|external|insufficient>"}`. Read the existing file, append, write back.
+1. From the project root run `python tools/append_stage_event.py rescue --conclusion=<defect|external|insufficient>` to append a `{"role": "rescue", "ts": "<server-generated UTC>", "conclusion": "<defect|external|insufficient>"}` line to `.godotmaker/stage.jsonl`. Do NOT hand-write the JSON or the timestamp — the helper exists so the timestamp comes from the system clock, not your own output.
 2. Inform the user the diagnosis is complete. Do not recommend a "next /gm-* step" — recovery routing is the caller's responsibility (user judgement, or whatever outer orchestrator invoked rescue), not yours.

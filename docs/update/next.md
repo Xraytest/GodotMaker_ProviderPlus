@@ -21,4 +21,6 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Fixed
 
+- **`stage.jsonl` event timestamps off the agent.** All ten `/gm-*` skills' "When Done" sections now invoke `tools/append_stage_event.py` (system clock + `O_APPEND`) instead of hand-writing the JSON. Fixes the fabricated and causally-violating timestamps observed in 2026-05-09 e2e fixgap / evaluate events.
+
 ## Removed

@@ -172,7 +172,7 @@ Write evaluation results to `.godotmaker/evaluation.json`:
 }
 ```
 
-After writing evaluation.json, append a line to `.godotmaker/stage.jsonl`: `{"role": "evaluate", "ts": "<UTC ISO timestamp>", "tag": "<Tag>"}`. Read the existing file (treat as empty if missing), append the new event, and write the full file back.
+After writing evaluation.json, from the project root run `python tools/append_stage_event.py evaluate --tag=<Tag>` to append a `{"role": "evaluate", "ts": "<server-generated UTC>", "tag": "<Tag>"}` line to `.godotmaker/stage.jsonl`. Do NOT hand-write the JSON or the timestamp — the helper exists so the timestamp comes from the system clock, not your own output.
 
 ## When Done
 

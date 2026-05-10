@@ -199,5 +199,5 @@ If any check fails:
 When all checks pass:
 
 1. Write `.godotmaker/verify_report.json` with `result: "pass"` (Field rules apply: `tooling_notes == []`, all `checks.*.result` ∈ {`pass`, `warn`}).
-2. Append a line to `.godotmaker/stage.jsonl`: `{"role": "verify", "ts": "<UTC ISO timestamp>"}`. Read the existing file (treat as empty if missing), append the new event, and write the full file back. Do NOT use Edit — its replace semantics fail silently on append.
+2. From the project root run `python tools/append_stage_event.py verify` to append a `{"role": "verify", "ts": "<server-generated UTC>"}` line to `.godotmaker/stage.jsonl`. Do NOT hand-write the JSON or the timestamp — the helper exists so the timestamp comes from the system clock, not your own output.
 3. Inform the user: `Verify complete. Recommended next: /gm-evaluate`
