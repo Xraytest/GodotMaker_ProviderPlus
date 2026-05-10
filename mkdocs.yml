@@ -71,6 +71,7 @@ nav:
       - Changelog: wiki/08-reference/changelog.md
   - Release Notes:
       - Latest: update/next.md
+      - v0.3.5: update/v0.3.5.md
       - v0.3.4: update/v0.3.4.md
       - v0.3.3: update/v0.3.3.md
       - v0.3.2: update/v0.3.2.md
