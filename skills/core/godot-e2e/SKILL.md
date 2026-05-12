@@ -43,7 +43,9 @@ preceded it.
 ```python
 # conftest.py (per test directory — explicit project path control;
 # alternatively set GODOT_E2E_PROJECT_PATH env or pytest.ini
-# `godot_e2e_project_path` and use the auto-registered `game` fixture)
+# `godot_e2e_project_path` and use the auto-registered `game` fixture).
+# Replace "/root/Main" below with your project's entry-scene root —
+# read it from `project.godot`'s `run/main_scene`.
 import pytest, os
 from godot_e2e import GodotE2E
 
@@ -213,6 +215,7 @@ All inherit from `GodotE2EError` (which carries `.logs`).
 | 7 | **Locators with semantic queries beat hardcoded paths** | `game.get_by_button("Start")` / `game.locator(group="player")` survives tree restructuring; `/root/Main/UI/Menu/StartButton` doesn't. Reserve raw paths for unique top-level nodes. |
 | 8 | **Read `.logs` on every E2E failure** | Every `GodotE2EError` carries `.logs` — what Godot printed during the failing command. `pytest -v` auto-includes `captured godot logs` on failure. Ignoring it doubles diagnosis time. |
 | 9 | **Default log verbosity is `"warning"`** | `push_error` and `push_warning` are captured; `print()` is NOT. Bump to `"info"` (via `log_verbosity="info"` at launch or `game.set_log_verbosity("info")` at runtime) only when debugging — at info verbosity log buffer fills 4-10× faster. |
+| 10 | **Use `wait_seconds` for Timer-gated waits** | `wait_process_frames(N)` counts frames, not seconds. Under headless uncapped FPS, `wait_process_frames(120)` finishes in well under 2s. Use `wait_seconds(t)` or `expect()` for any wait gated by a `Timer` or wall-clock seconds. |
 
 ## Fixture Strategies
 
