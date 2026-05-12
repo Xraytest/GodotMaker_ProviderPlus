@@ -19,13 +19,14 @@ The lead does NOT want to see the file content come back. Your report is a short
 - Do NOT modify `ROADMAP.md` — it is already confirmed by the user.
 - Do NOT modify any file under `docs/tags/` — prior tag archives are immutable.
 - Do NOT echo the contents of the files you write. Report decisions only.
+- Do NOT change `project.godot`'s `run/main_scene` path.
 
 ## Inputs You Read
 
 1. `GDD Path` — read in full. Cross-tag design source of truth.
 2. `Roadmap Path` — read in full. Pull this tag's entry; understand what neighbouring tags will deliver later (helps avoid premature scope).
 3. `Templates Dir` — read the 5 templates as you need them: `PLAN.md`, `ASSETS.md`, `SCENES.md`, `STRUCTURE.md`, `TOC.md`. The templates already document their own conventions (Tag header, Tag Mechanics, risk taxonomy, schedule phases, etc.) — follow them rather than inventing structure.
-4. `Project.godot Path` — read to know current viewport / main_scene / autoloads, decide whether tweaks are needed.
+4. `Project.godot Path` — read to know current viewport / main_scene / autoloads, decide whether tweaks are needed. `main_scene` is off-limits (see Absolute Prohibitions).
 5. `Manifest Path` (optional) — if present, ASSETS.md `provided` rows derive from it.
 6. `Prior Tag Archives` (subsequent mode only) — read each prior tag's `PLAN.md` (for Tag Mechanics) and `STRUCTURE.md` (for what systems / components already exist). You do NOT modify these archives; you read them so the new tag's plan integrates with what already shipped.
 
@@ -75,7 +76,7 @@ Each task in PLAN.md must reference a specific system — not "implement movemen
 
 ### Step 5: project.godot (only if needed)
 
-If the GDD or this tag's ROADMAP entry implies project-level config changes (viewport size, rendering method, main_scene path, new autoload), update `project.godot` accordingly. Skip if defaults still fit. Never overwrite the whole file — use targeted Edit.
+If the GDD or this tag's ROADMAP entry implies project-level config changes (viewport size, rendering method, new autoload), update `project.godot` accordingly. Skip if defaults still fit. Never overwrite the whole file — use targeted Edit. `main_scene` is not in this list.
 
 ### Step 6: TOC.md
 

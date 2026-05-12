@@ -27,5 +27,6 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 - (WIP) Rewire Agent prompt/output trace capture to `PreToolUse`/`PostToolUse` because the `SubagentStart` payload has no `prompt` field and silently wrote 0-byte traces.
 - Drop the SubagentStop hook's e2e content requirement on worker reports, since `check_file_permissions` already forbids workers from writing `e2e/`.
+- Move `project.godot.run/main_scene` retargeting from decomposer to `/gm-build`'s dispatching agent so headless runs between `/gm-gdd` and the entry-scene worker no longer flood logs with `Cannot open file`.
 
 ## Removed
