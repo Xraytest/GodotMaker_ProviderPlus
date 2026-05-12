@@ -37,7 +37,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 6. Add a changelog entry to [`docs/update/next.md`](docs/update/next.md) describing your change. Rules:
    - **One sentence per bullet.** If you can't fit it, your bullet is doing two things — split it.
    - **Describe user-facing intent, not the investigation behind it.** No incident dates, no internal project / test names, no debugging narrative. Past `vX.Y.Z.md` archives are the format reference.
-   - **If shipped but not verified to work end-to-end, prefix the bullet with `(WIP)`** so the release-prep agent doesn't promote unfinished work into a tagged release.
+   - **Use `(WIP)` only when the change itself is incomplete**. The prefix exists so the release-prep agent doesn't promote unfinished work into a tagged release — don't dilute it.
 7. Open a PR against `main` using the [PR template](.github/PULL_REQUEST_TEMPLATE.md).
 
 ## Development Setup

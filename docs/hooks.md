@@ -193,8 +193,7 @@ Validates report format and content for all subagent roles.
 | analyst | Status, Asset Summary, Art Style Summary, Files Generated |
 
 **Worker-specific deep checks:**
-- `check_test_substance()` — Tests section must have unittest + e2e results with actual pass/fail output
-- `check_e2e_files_exist()` — E2E test file paths in report must exist, be non-empty, non-placeholder
+- `check_test_substance()` — Tests section must include unittest results with actual pass/fail output
 - `check_resource_paths()` — `res://` paths in .gd files must exist
 - `check_classname_conflicts()` — `class_name` declarations must not conflict with Godot built-ins
 

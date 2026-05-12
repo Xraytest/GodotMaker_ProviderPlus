@@ -21,8 +21,11 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 
 ## Changed
 
+- Verifier and worker docs no longer prescribe authoring or running e2e — `/gm-evaluate` is the single source of truth for `e2e/`.
+
 ## Fixed
 
 - (WIP) Rewire Agent prompt/output trace capture to `PreToolUse`/`PostToolUse` because the `SubagentStart` payload has no `prompt` field and silently wrote 0-byte traces.
+- Drop the SubagentStop hook's e2e content requirement on worker reports, since `check_file_permissions` already forbids workers from writing `e2e/`.
 
 ## Removed

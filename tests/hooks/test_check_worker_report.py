@@ -1,7 +1,4 @@
 """Tests for check_worker_report.py hook."""
-import os
-import shutil
-
 import pytest
 from .helpers import run_hook, is_blocked, cleanup_metrics
 
@@ -10,11 +7,9 @@ HOOK = "check_worker_report.py"
 COMPLETE_WORKER = (
     "## Report: PlayerMovement\n\n"
     "### Status: DONE\n\n"
-    "### Files Changed\n- player_system.gd: created\n- e2e/test_player_e2e.gd: created\n\n"
+    "### Files Changed\n- player_system.gd: created\n\n"
     "### Tests\n#### Unit Tests\n- test/test_player.gd: 3 tests, 3 passed\n"
-    "- Commands run: godot --headless\n"
-    "#### E2E Tests\n- e2e/test_player_e2e.gd: e2e scenario 1 passed, 0 failed\n"
-    "- Commands run: godot-e2e e2e/\n\n"
+    "- Commands run: godot --headless\n\n"
     "### Build\n- Status: PASS\n\n"
     "### Memory Entry\nLearned about movement"
 )
@@ -70,9 +65,7 @@ class TestWorkerReport:
     def test_empty_tests_section_blocked(self):
         msg = COMPLETE_WORKER.replace(
             "#### Unit Tests\n- test/test_player.gd: 3 tests, 3 passed\n"
-            "- Commands run: godot --headless\n"
-            "#### E2E Tests\n- e2e/test_player_e2e.gd: e2e scenario 1 passed, 0 failed\n"
-            "- Commands run: godot-e2e e2e/",
+            "- Commands run: godot --headless",
             "Nothing here"
         )
         _, _, parsed = run_hook(HOOK, {
@@ -82,18 +75,21 @@ class TestWorkerReport:
         })
         assert is_blocked(parsed), "Should block when Tests section has no substance"
 
-    def test_missing_e2e_blocked(self):
-        msg = COMPLETE_WORKER.replace(
-            "#### E2E Tests\n- e2e/test_player_e2e.gd: e2e scenario 1 passed, 0 failed\n"
-            "- Commands run: godot-e2e e2e/",
-            ""
-        )
+    def test_unittest_only_allowed(self):
+        """Worker report with unit tests but no e2e content is allowed.
+
+        E2E is owned by the Evaluator (gm-evaluate); workers are forbidden
+        from writing to e2e/ by check_file_permissions. The report hook
+        must not demand e2e content from workers.
+        """
         _, _, parsed = run_hook(HOOK, {
             "hook_event_name": "SubagentStop",
             "agent_id": "w1",
-            "last_assistant_message": msg,
+            "last_assistant_message": COMPLETE_WORKER,
         })
-        assert is_blocked(parsed), "Should block when e2e mention missing"
+        assert not is_blocked(parsed), (
+            "Worker report without e2e mention should be allowed"
+        )
 
 
 class TestVerifierReport:
@@ -136,45 +132,6 @@ class TestReviewerReport:
             "last_assistant_message": msg,
         })
         assert is_blocked(parsed)
-
-
-class TestE2ERunResults:
-    """Tests that worker reports must include actual e2e run results, not just file paths."""
-
-    def test_e2e_mention_without_results_blocked(self):
-        """e2e mentioned but no pass/fail output → blocked."""
-        msg = COMPLETE_WORKER.replace(
-            "e2e scenario 1 passed, 0 failed",
-            "test file created"
-        )
-        _, _, parsed = run_hook(HOOK, {
-            "hook_event_name": "SubagentStop",
-            "agent_id": "w1",
-            "last_assistant_message": msg,
-        })
-        assert is_blocked(parsed), "Should block when e2e has no run results"
-
-    def test_e2e_placeholder_in_results_blocked(self):
-        """e2e results say 'placeholder' → blocked."""
-        msg = COMPLETE_WORKER.replace(
-            "e2e scenario 1 passed, 0 failed",
-            "e2e: placeholder ready, 0 scenarios"
-        )
-        _, _, parsed = run_hook(HOOK, {
-            "hook_event_name": "SubagentStop",
-            "agent_id": "w1",
-            "last_assistant_message": msg,
-        })
-        assert is_blocked(parsed), "Should block when e2e results are placeholder"
-
-    def test_e2e_with_actual_results_allowed(self):
-        """e2e with real pass/fail output → allowed."""
-        _, _, parsed = run_hook(HOOK, {
-            "hook_event_name": "SubagentStop",
-            "agent_id": "w1",
-            "last_assistant_message": COMPLETE_WORKER,
-        })
-        assert not is_blocked(parsed)
 
 
 class TestFlexibleMarkerDetection:
@@ -221,11 +178,9 @@ class TestFlexibleMarkerDetection:
         msg = (
             "Here is my report.\n\n"
             "### Status: DONE\n\n"
-            "### Files Changed\n- player_system.gd: created\n- e2e/test_player_e2e.gd: created\n\n"
+            "### Files Changed\n- player_system.gd: created\n\n"
             "### Tests\n#### Unit Tests\n- test/test_player.gd: 3 tests, 3 passed\n"
-            "- Commands run: godot --headless\n"
-            "#### E2E Tests\n- e2e/test_player_e2e.gd: e2e scenario 1 passed, 0 failed\n"
-            "- Commands run: godot-e2e e2e/\n\n"
+            "- Commands run: godot --headless\n\n"
             "### Build\n- Status: PASS\n\n"
             "### Memory Entry\nLearned about movement"
         )
@@ -326,56 +281,3 @@ class TestDeadloopProtection:
             "last_assistant_message": msg,
         })
         assert is_blocked(parsed), "Different agent should not be affected"
-
-
-class TestWorktreeFileResolution:
-    """Tests that e2e file checks resolve paths in worktree directories."""
-
-    WORKTREE_BASE = os.path.join(".claude", "worktrees", "agent-test123")
-
-    @pytest.fixture(autouse=True)
-    def setup_worktree(self):
-        """Create a fake worktree with an e2e test file."""
-        e2e_dir = os.path.join(self.WORKTREE_BASE, "tests", "e2e")
-        os.makedirs(e2e_dir, exist_ok=True)
-        # Write a real e2e test file (must be > 50 chars, no placeholder keywords)
-        e2e_file = os.path.join(e2e_dir, "test_spawn.py")
-        with open(e2e_file, "w") as f:
-            f.write(
-                "def test_enemies_spawn(game):\n"
-                "    game.wait_seconds(3)\n"
-                "    count = game.call('/root/Main/World', 'get_child_count')\n"
-                "    assert count > 0, 'Expected enemies to spawn'\n"
-            )
-        # Also create a .gd file for resource path checks
-        src_dir = os.path.join(self.WORKTREE_BASE, "src", "systems")
-        os.makedirs(src_dir, exist_ok=True)
-        with open(os.path.join(src_dir, "s_spawn.gd"), "w") as f:
-            f.write('class_name SpawnSystem extends System\n')
-        yield
-        if os.path.isdir(self.WORKTREE_BASE):
-            shutil.rmtree(self.WORKTREE_BASE)
-
-    def test_e2e_file_found_in_worktree(self):
-        """e2e file only in worktree should be found and pass check."""
-        # The report references e2e/test_spawn.py which only exists in worktree
-        msg = (
-            "## Report: SpawnSystem\n\n"
-            "### Status: DONE\n\n"
-            "### Files Changed\n"
-            "- `src/systems/s_spawn.gd`: created\n"
-            "- `e2e/test_spawn.py`: created\n\n"
-            "### Tests\n"
-            "#### Unit Tests\n- test/test_spawn.gd: 3 tests, 3 passed\n"
-            "#### E2E Tests\n- e2e/test_spawn.py: e2e scenario 1 passed\n\n"
-            "### Build\n- Status: PASS\n\n"
-            "### Memory Entry\nSpawn system done"
-        )
-        _, _, parsed = run_hook(HOOK, {
-            "hook_event_name": "SubagentStop",
-            "agent_id": "wt1",
-            "last_assistant_message": msg,
-        })
-        assert not is_blocked(parsed), (
-            "Should pass when e2e file exists in worktree"
-        )

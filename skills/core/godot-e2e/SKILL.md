@@ -271,28 +271,6 @@ def test_player_moves_right(game):
     )
 ```
 
-### Dispatcher E2E Spec
-
-Before dispatching a worker, the dispatching role writes an E2E spec
-to `.godotmaker/workers/{task_id}.md` containing:
-- Task objective and constraints
-- **E2E acceptance criteria**: specific "user action → expected state change" pairs
-- Known gotchas or dependencies
-- This file is passed to both the worker (for test writing) AND the verifier (for validation)
-
-Verifiers MUST read the spec and confirm the worker's E2E tests cover ALL listed acceptance criteria.
-
-## E2E Helper Convention
-
-Workers maintain reusable E2E helper functions in `e2e/helpers/` to
-prevent test duplication and ensure fixture updates propagate.
-
-1. Each worker creates/updates a helper file for their system's E2E interface (e.g., `player_helper.py`)
-2. Helper functions wrap common multi-step operations (e.g., `start_game` = change scene + wait + verify)
-3. Each helper file MUST have a corresponding unittest: `e2e/helpers/test_{name}_helper.py`
-4. Helper unittests verify the helper functions work (game launches, actions execute, no crash)
-5. When a worker modifies a system that changes E2E behavior (node paths, method signatures), they MUST update the corresponding helper
-
 ## Fixture Sync Rules
 
 1. **Entry scene change** → update `conftest.py`: change `wait_for_node` path, add `change_scene` if needed
@@ -301,7 +279,6 @@ prevent test duplication and ensure fixture updates propagate.
 4. **Private → public methods** → E2E `game.call()` / `Locator.call()` cannot call `_private()` methods; any method called by E2E must be public
 5. **After ANY structural change** → run `godot-e2e e2e/ -v` to catch broken fixtures immediately
 
-> **Note:** The dispatching role writes E2E specs to `.godotmaker/workers/{task_id}.md` before dispatching workers. Verifiers MUST confirm the worker's E2E tests cover ALL listed acceptance criteria.
 
 ## Extended References
 

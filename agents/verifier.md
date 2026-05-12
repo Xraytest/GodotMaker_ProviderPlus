@@ -127,22 +127,11 @@ godot --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreH
 ```
 Report: total passed / failed / skipped. Each failure: test name, expected vs actual. `--ignoreHeadlessMode` is required by `GdUnitCmdTool.gd` under `--headless`; the path uses capital-U `gdUnit4/` to match the upstream addon layout.
 
-### E2E Tests
-```bash
-# Read godot-e2e skill for project-specific commands
-godot-e2e e2e/ -v
-```
-Report: scenarios passed / failed. Each failure: scenario name, step that failed.
-
 ### Static Check
 ```bash
 python tools/check_project.py <project_dir> --build --ecs --tests --plan --mcp
 ```
-Report: each check line (PASS/FAIL). `--all` is intentionally not used: it adds `--e2e`, which gates the Evaluator's territory (e2e tests are written/maintained during `/gm-evaluate`, AFTER verify). Including it would phantom-fail every first verify of a fresh tag.
-
-### Visual QA
-Use godot-e2e `game.screenshot()` to capture screenshots (NOT external screenshot tools).
-Feed captured images to visual-qa skill for analysis. Report: match assessment, specific defects.
+Report: each check line (PASS/FAIL). `--all` is intentionally not used: it adds `--e2e`, which gates the Evaluator's territory (e2e tests are written/maintained during `/gm-evaluate`, AFTER verify).
 
 ### Runtime (MCP)
 Use mcp-driver to launch and observe. Report: crashes, errors, behavior issues.

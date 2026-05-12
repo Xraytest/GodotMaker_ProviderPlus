@@ -160,8 +160,7 @@ Hook 还会重新验证前置角色在 `config/stage_schemas.json` 中的 `files
 | analyst | Status, Asset Summary, Art Style Summary, Files Generated |
 
 **Worker 专项深度检查：**
-- `check_test_substance()` — Tests 章节必须包含单元测试和端到端测试的实际通过/失败输出
-- `check_e2e_files_exist()` — 报告中的 E2E 测试文件路径必须存在、非空、非占位符
+- `check_test_substance()` — Tests 章节必须包含单元测试的实际通过/失败输出
 - `check_resource_paths()` — .gd 文件中的 `res://` 路径必须存在
 - `check_classname_conflicts()` — `class_name` 声明不得与 Godot 内置名称冲突
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """SubagentStop hook: validate worker/verifier report completeness.
 
-Worker reports MUST have: Status, Files Changed, Tests (with unittest results
-and e2e test file paths), Build, Memory Entry.
+Worker reports MUST have: Status, Files Changed, Tests (with unittest
+results), Build, Memory Entry.
 
 Verifier reports MUST have: Overall, Results, Adversarial Probes.
 
@@ -31,13 +31,6 @@ WORKER_TEST_SUBSTANCE = [
     r"test[_/].*\.gd",
     r"(\d+\s*(passed|failed|tests?))|Commands?\s*run",
 ]
-
-E2E_FILE_PATTERN = re.compile(
-    r"(?:^|\s|`)((?:test|tests|e2e|res://)[^\s`]*e2e[^\s`]*\.(?:gd|py))",
-    re.IGNORECASE,
-)
-
-PLACEHOLDER_KEYWORDS = ["placeholder", "todo", "stub", "not implemented"]
 
 # Most dangerous Godot built-in names that conflict with class_name.
 # Maintained separately from tools/check_classname.py (full list).
@@ -97,56 +90,6 @@ def check_sections(message: str, required: list[tuple[str, str]]) -> list[str]:
         if not re.search(pattern, message, re.IGNORECASE):
             missing.append(name)
     return missing
-
-
-def check_e2e_files_exist(message: str, worktree_dirs: list[str]) -> str | None:
-    """Extract e2e file paths from worker report and verify they exist and are not placeholders."""
-    # Only check file existence when inside a Godot project
-    if not os.path.exists("project.godot"):
-        return None
-
-    # Extract the Tests section and Files Changed section
-    tests_content = _extract_section(message, "Tests")
-    files_content = _extract_section(message, "Files Changed")
-
-    search_text = ""
-    if tests_content:
-        search_text += tests_content
-    if files_content:
-        search_text += "\n" + files_content
-
-    if not search_text:
-        return None
-
-    # Find e2e file paths
-    e2e_paths = E2E_FILE_PATTERN.findall(search_text)
-    if not e2e_paths:
-        return "No e2e test file path found in report — worker must create and reference an e2e test file"
-
-    # Resolve res:// paths and check each file (also checking worktrees)
-    for raw_path in e2e_paths:
-        path = raw_path.strip("`").strip()
-        # Convert res:// to relative path
-        if path.startswith("res://"):
-            path = path[len("res://"):]
-
-        resolved = _resolve_file(path, worktree_dirs)
-        if not resolved:
-            return f"e2e test file does not exist: {raw_path} — worker must create the file, not just reference it"
-
-        try:
-            with open(resolved, encoding="utf-8", errors="ignore") as fh:
-                content = fh.read().strip()
-        except OSError:
-            return f"Cannot read e2e test file: {raw_path}"
-
-        if len(content) < 50:
-            return f"e2e test file {raw_path} is too short ({len(content)} chars) — must contain real test logic, not a placeholder"
-
-        if any(kw in content.lower() for kw in PLACEHOLDER_KEYWORDS):
-            return f"e2e test file {raw_path} contains placeholder content — must have real test logic"
-
-    return None
 
 
 def extract_files_changed(message: str) -> list[str]:
@@ -223,7 +166,7 @@ def check_test_substance(message: str) -> str | None:
     if content is None:
         return None
     if not content or len(content) < 20:
-        return "Tests section is empty — must include unittest results and e2e test file paths"
+        return "Tests section is empty — must include unittest results"
 
     has_substance = any(
         re.search(p, content, re.IGNORECASE) for p in WORKER_TEST_SUBSTANCE
@@ -232,35 +175,11 @@ def check_test_substance(message: str) -> str | None:
         return "Tests section lacks substance — must include test file paths and pass/fail results"
 
     has_unittest = bool(re.search(r"unit\s*test|gdunit|test_.*\.gd", content, re.IGNORECASE))
-    has_e2e = bool(re.search(r"e2e|end.to.end|scenario|automation", content, re.IGNORECASE))
-
     if not has_unittest:
         return (
             "Tests section missing unittest results — every system must have unit tests. "
             "Include the test file name (e.g., test_movement.gd) and run output (e.g., '5 tests -- 5 passed, 0 failed')."
         )
-    if not has_e2e:
-        return (
-            "Tests section missing e2e test results — every worker must write AND run e2e tests. "
-            "Include the e2e test file path and run output (e.g., 'e2e/test_movement.py: 2 passed in 1.5s'). "
-            "If this task genuinely has no e2e component, state 'E2E: N/A — [reason]' explicitly."
-        )
-
-    # Check for actual run results (not just file paths)
-    # Must have a non-zero pass/fail count (e.g., "1 passed", "3 scenarios passed")
-    has_e2e_results = bool(re.search(
-        r"e2e.*[1-9]\d*\s*(pass|fail|error|scenario)",
-        content, re.IGNORECASE,
-    ))
-    # Also check for "placeholder", "TODO", "stub" in e2e section
-    has_placeholder = bool(re.search(
-        r"placeholder|TODO|stub|not implemented",
-        content, re.IGNORECASE,
-    ))
-    if has_placeholder:
-        return "Tests section contains placeholder e2e content — must have real e2e test results"
-    if not has_e2e_results:
-        return "Tests section mentions e2e but has no run results — must include actual e2e pass/fail output (e.g., '1 scenario passed')"
 
     return None
 
@@ -352,10 +271,6 @@ def main_with_data(data: dict) -> None:
         test_issue = check_test_substance(message)
         if test_issue:
             _block(test_issue, state_key=state_key)
-
-        e2e_issue = check_e2e_files_exist(message, worktree_dirs)
-        if e2e_issue:
-            _block(e2e_issue, state_key=state_key)
 
         if os.path.exists("project.godot"):
             files = extract_files_changed(message)
