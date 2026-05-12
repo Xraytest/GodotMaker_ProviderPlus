@@ -26,7 +26,6 @@ Agent({
 ### Context                                              [REQUIRED]
 - Project: {game name and type}
 - ECS Framework: gecs
-- Project Path: {absolute path}
 
 ### Input Files (Read These First)                       [REQUIRED]
 - {path}: {what it contains}
@@ -84,6 +83,7 @@ Agent({
 13. **Worker self-check is mandatory**: Workers must run the self-check protocol before submitting their report. If self-check is not mentioned in the report, reject it.
 14. **UI/scene tasks require SCENES.md reference.** When dispatching a worker for any UI screen, HUD, menu, or scene layout task, you MUST copy the relevant scene description from SCENES.md into the brief. Workers without layout specs will produce inconsistent UIs.
 15. **Worker model from config.** Read `worker_model` from `.godotmaker/config.yaml` (default: `opus`) and include it as `model:` in every Agent() call. See the Agent Call template at the top.
+16. **Cwd-relative paths in the brief.** Fill every `{path}` placeholder as cwd-relative (e.g. `src/systems/s_jump.gd`, not `D:/.../src/systems/s_jump.gd`).
 
 ## Worker Utility Convention
 
@@ -106,6 +106,10 @@ Workers with **no file ownership overlap** can run in parallel using git worktre
 - Two or more tasks have **completely disjoint file sets** (no shared .gd/.tscn/.tres files)
 - Both tasks are in the same `/gm-build` cycle (risk or main phase)
 - Neither task depends on the other's output
+
+### Before dispatch — snapshot the working tree
+
+If `git status --porcelain` is non-empty in the project root, run `git add -A && git commit -m "wip: parallel dispatch snapshot"` before sending any `isolation: "worktree"` Agent call.
 
 ### How to dispatch
 
@@ -133,7 +137,7 @@ Send **both Agent calls in the same message** — this is what triggers parallel
 
 ### Merge procedure after parallel workers complete
 
-Each worktree agent returns a branch name if it made changes. Merge them back:
+If a worker's branch is missing or `git diff main..{branch}` is empty, treat the work as lost and re-dispatch. Otherwise merge them back:
 
 1. **Check for conflicts** before merging:
    ```bash

@@ -19,6 +19,7 @@ You are a worker agent implementing a bounded unit of work for a Godot game proj
 7. **Write a MEMORY entry.** Every task produces learnings — document them.
 8. **No gold-plating.** No extra comments, docstrings, or type annotations on unchanged code.
 9. **Stay inside the project tree.** Do NOT write files anywhere else — not system temp dirs, not the home directory, not Claude Code's own scratchpad path. If you need a scratch file, create it under `.godotmaker/scratch/` (mkdir -p if missing) and delete it before reporting DONE.
+10. **Cwd-relative paths.** Your cwd is the project root (run `pwd` to confirm). Translate every path in your brief to be relative to it; do NOT use absolute paths into the project tree.
 
 ## Execution Order
 
@@ -30,7 +31,8 @@ You are a worker agent implementing a bounded unit of work for a Godot game proj
 6. Confirm your unit tests cover every e2e-testable interface (public methods, signals, simulate_* helpers)
 7. Run headless-build to confirm compilation
 8. Run unit tests
-9. Write your report (using the EXACT format below)
+9. Commit your changes from the project root: `git add -A && git commit -m "<task name>"` (skip if `git status --porcelain` is empty).
+10. Write your report (using the EXACT format below)
 
 ## Brief Format (What You Receive)
 
@@ -45,7 +47,6 @@ The lead agent provides your brief with these fields. REQUIRED fields are always
 ### Context                                              [REQUIRED]
 - Project: {game name and type}
 - ECS Framework: gecs
-- Project Path: {absolute path}
 
 ### Input Files (Read These First)                       [REQUIRED]
 - {path}: {what it contains}
