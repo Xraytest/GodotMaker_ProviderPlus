@@ -28,55 +28,50 @@ Read `.godotmaker/stage.jsonl` (treat as empty if missing) — each line is `{"r
   > If you need to redo this step or have other plans, just tell me."
 - Otherwise → proceed (verify is naturally re-invoked after each build/fixgap cycle).
 
-## Resolve `godot` binary
+## Run the checks
 
-Read `godot_path` from `.claude/godotmaker.yaml` and substitute it
-verbatim for `<godot_path>` in every `godot --headless …` command
-below. The path was validated at publish time and is the source of
-truth for which Godot binary this project uses.
+From the project root:
 
-If `.claude/godotmaker.yaml` is missing the `godot_path` field, fall
-back to plain `godot` (PATH lookup). If THAT also fails, STOP and tell
-the user `Godot binary not configured — re-run tools/publish.py to set
-godot_path in .claude/godotmaker.yaml`. Do NOT spelunk through PATH
-directories or guess install locations.
-
-## Verification Checklist
-
-Run each check in order. Record exact command and output.
-
-### 1. Build
 ```bash
-"<godot_path>" --headless --quit 2>&1
+python tools/run_verify.py
 ```
-Criteria: zero ERROR lines in output.
 
-### 2. Unit Tests
-```bash
-"<godot_path>" --headless --path . -s addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode --add test/
-```
-Criteria: all tests pass (N passed, 0 failed). Path casing is `addons/gdUnit4/` (capital U — matches the upstream repo layout) and the runner is `bin/GdUnitCmdTool.gd`; `--ignoreHeadlessMode` is required for `--headless` runs.
+`run_verify.py` wraps the four mechanical checks (build / unit tests /
+lint / static check) and prints a JSON document matching `Output Format`
+Section B to stdout. Capture stdout.
 
-### 3. Lint
-**Currently disabled.** `gdtoolkit` (gdlint + gdformat) is not invoked
-during verify. Reason: repeated
-`gdtoolkit/linter/class_checks.py:144 NotImplementedError` crashes on
-common ECS-style GDScript class shapes, plus low signal-to-noise versus
-the headless compile (Section 1) and reviewer pattern checks (run during
-gm-build's review pass). Re-enabling tracked as ROADMAP `R-112`.
+What the script does:
 
-Still write the `lint` block in `verify_report.json` (Section B) — set
-`result: "pass"`, `issues: []`, `format_drift: null`. The schema requires
-the field; an all-pass record is the no-op that lets consumers continue
-to work without special-casing the disable.
+- Reads `godot_path` from `.claude/godotmaker.yaml`; falls back to
+  plain `godot` from PATH. A missing or broken binary surfaces as a
+  `tooling_notes[].suggested_fallback = "escalate"` entry.
+- Runs `<godot_path> --headless --quit` and parses `ERROR:` lines into
+  `checks.build.errors[]`.
+- Runs `<godot_path> --headless ... addons/gdUnit4/bin/GdUnitCmdTool.gd
+  --ignoreHeadlessMode --add test/` and parses the summary line into
+  `checks.unit_tests.{passed, failed, failures[]}`.
+- Stubs `checks.lint` as `pass` with `format_drift: null`. Do NOT
+  re-enable here.
+- Delegates `checks.static_check` to
+  `python tools/check_project.py <project_dir> --build --ecs --tests --plan --mcp`.
+- Exit code 0 = ran to completion (per-check pass/fail is in the JSON).
 
-### 4. Static Check
-```bash
-python tools/check_project.py <project_dir> --build --ecs --tests --plan --mcp
-```
-Criteria: no FAIL lines.
+## Sanity-check the script output
 
-**Why not `--all`:** `--all` adds `--e2e`, which is the Evaluator's territory — verify must not gate it.
+Before writing the report, validate. Block on any of these:
+
+- JSON does not parse, or any of `result` / `ts` / `checks` /
+  `tooling_notes` is missing
+- Any of the four `checks.{build,unit_tests,lint,static_check}`
+  entries is absent
+- `result == "pass"` but `tooling_notes` is non-empty — re-run or escalate
+- `checks.unit_tests.passed + .failed == 0` — spot-check by running the gdUnit4 command directly
+- Any `tooling_notes` entry whose `crashed_on` looks unrelated to the
+  failing check
+
+If any block fires, diagnose by running the implicated command
+yourself, then either re-run `run_verify.py` or surface the issue
+verbatim to the user. Do NOT silently rewrite the script's output.
 
 ## Output Format
 
@@ -84,28 +79,34 @@ You produce **two outputs**:
 
 ### A. Human-readable report (chat)
 
+Build this from the JSON the script returned — do not re-run any
+command for the chat side.
+
 ```
 ## Verification Report
 
 ### Build
-Command: "<godot_path>" --headless --quit 2>&1
 Result: PASS | FAIL
-Output: {paste actual output}
+{If FAIL, one line per checks.build.errors[] entry: `- {file}:{line}: {message}` (file/line may be empty)}
 
 ### Unit Tests
-Command: {exact command}
 Result: PASS | FAIL
-Output: {N passed, M failed}
+{N passed, M failed}
+{If FAIL, one line per checks.unit_tests.failures[]: `- {test}: {message}`}
 
 ### Lint
-Status: SKIP (gdtoolkit disabled — see "3. Lint" above; ROADMAP R-112)
+Status: SKIP (gdtoolkit disabled — ROADMAP R-112)
 
 ### Static Check
-Command: python tools/check_project.py <dir> --build --ecs --tests --plan --mcp
 Result: PASS | FAIL
-Output: {paste PASS/FAIL lines}
+{If FAIL, one line per checks.static_check.issues[]: `- {check}: {detail}`}
 
 ### Overall: PASS | FAIL
+
+{If tooling_notes is non-empty, append:
+## Tooling Notes
+- {tool}: {error} (suggested_fallback: {suggested_fallback})
+…}
 ```
 
 ### B. Machine-readable report (`.godotmaker/verify_report.json`)
@@ -188,16 +189,16 @@ Field rules:
 
 ## On Failure
 
-If any check fails:
+When the script's JSON has `result: "fail"`:
 
-1. Write `.godotmaker/verify_report.json` with `result: "fail"` and the per-check details.
-2. Tell the user which checks failed. Suggest `/gm-build` if the last state-changing event was `build`, `/gm-fixgap` if it was `fixgap`.
+1. Write the script's JSON verbatim to `.godotmaker/verify_report.json`.
+2. Emit the chat report (Section A) and tell the user which checks failed. Suggest `/gm-build` if the last state-changing event was `build`, `/gm-fixgap` if it was `fixgap`.
 3. Do NOT append a `verify` event to `stage.jsonl` — only PASS records a stage event.
 
 ## When Done
 
-When all checks pass:
+When the script's JSON has `result: "pass"`:
 
-1. Write `.godotmaker/verify_report.json` with `result: "pass"` (Field rules apply: `tooling_notes == []`, all `checks.*.result` ∈ {`pass`, `warn`}).
+1. Write the script's JSON verbatim to `.godotmaker/verify_report.json`. (Field rules apply: `tooling_notes == []`, all `checks.*.result` ∈ {`pass`, `warn`} — the script enforces these but spot-check them once more before writing.)
 2. From the project root run `python tools/append_stage_event.py verify` to append a `{"role": "verify", "ts": "<server-generated UTC>"}` line to `.godotmaker/stage.jsonl`. Do NOT hand-write the JSON or the timestamp — the helper exists so the timestamp comes from the system clock, not your own output.
 3. Inform the user: `Verify complete. Recommended next: /gm-evaluate`
