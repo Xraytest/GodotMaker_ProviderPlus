@@ -21,6 +21,7 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - Each gm-* skill commits its stage outputs in When Done; new Stop hook `check_clean_workspace.py` reminds the agent once when the working tree is dirty at end of a skill.
 - `tools/seal_tag.py` — three subcommands (`archive` / `reset` / `bundle`) replacing the per-call fs/git work in `/gm-finalize` Steps 4/5/7/8.
 - `tools/run_verify.py` — wraps `/gm-verify`'s four mechanical checks (build / unit tests / lint / static check) into a single JSON-emitting command so the SKILL agent validates and reports instead of orchestrating four bash invocations.
+- `hooks/log_compaction.py` — PreCompact hook that records `compaction` events to `metrics.jsonl` with `session_id`, `trigger` (manual/auto), and current pipeline role, so AAR analysis no longer has to scrape Claude Code's native session jsonl to know whether compaction fired.
 
 ## Changed
 

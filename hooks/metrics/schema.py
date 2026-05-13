@@ -24,6 +24,9 @@ class EventType(str, Enum):
     HOOK_BLOCK = "hook_block"
     HOOK_ALLOW = "hook_allow"
 
+    # Context lifecycle
+    COMPACTION = "compaction"
+
     # Gate / verification
     GATE_CHECK = "gate_check"
     STAGE_COMPLETE = "stage_complete"
