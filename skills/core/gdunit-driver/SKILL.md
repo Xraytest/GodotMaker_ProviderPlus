@@ -228,6 +228,22 @@ func test_with_scene() -> void:
 
 `auto_free()` is critical — without it, test failures leak nodes and eventually crash the runner.
 
+### Stub design
+
+A stub class must expose every property and method the system-under-test reads or calls on it.
+
+```gdscript
+# WRONG — bare Node has no global_position, no velocity
+var entity = auto_free(Node.new())
+system.process_one(entity)  # Invalid access to property "global_position"
+
+# RIGHT — stub class carries the properties the system reads
+var entity = auto_free(CharacterBody2D.new())
+system.process_one(entity)
+```
+
+Grep the system code for every property and method it touches on the stubbed argument; each one must exist on the stub class.
+
 ### Async tests
 
 For code involving signals, timers, or physics frames:
