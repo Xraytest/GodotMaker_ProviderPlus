@@ -11,6 +11,7 @@ and how gecs maps to our ECS_DESIGN.md architectural decisions.
 - [PendingDelete Pattern](#pendingdelete-pattern)
 - [Transform Synchronization](#transform-synchronization)
 - [Relationship Factory](#relationship-factory)
+- [Pure-Static Helpers and Test Seams](#pure-static-helpers-and-test-seams)
 - [ECS_DESIGN.md Cross-Reference](#ecs_designmd-cross-reference)
 
 ## Naming Conventions
@@ -219,6 +220,30 @@ Benefits:
 - Single place to rename/adjust relationships
 - System code reads cleanly: `entity.has_relationship(Rels.attacks)`
 - Avoids inline `Relationship.new()` construction scattered across systems
+
+## Pure-Static Helpers and Test Seams
+
+Factor non-trivial math out of Systems into pure-static `*_math.gd` / `*_logic.gd` siblings. The System keeps the ECS glue (queries, component IO, Node side effects); the helper holds the rule.
+
+```gdscript
+# jump_math.gd — pure functions, no Node, no Component, no ECS
+class_name JumpMath
+
+static func gravity(jump_height: float, time_to_apex: float) -> float:
+    return 2.0 * jump_height / (time_to_apex * time_to_apex)
+```
+
+Expose each System's rule through a `simulate_*` static method. Unit tests and e2e drivers call it directly instead of driving the full input → physics → component pipeline.
+
+```gdscript
+class_name PlayerPhysicsSystem extends System
+
+static func simulate_input(entity: Entity, dir: Vector2, pressed: bool, held: bool) -> void:
+    var intent = entity.get_component(C_MovementIntent)
+    intent.dir = dir
+    intent.jump_pressed = pressed
+    intent.jump_held = held
+```
 
 ---
 

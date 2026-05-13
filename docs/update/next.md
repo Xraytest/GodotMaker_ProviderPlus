@@ -31,6 +31,8 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - `visual-qa` SKILL now lists each mode's exact argv shape in a decision table and rejects ambiguous shapes (e.g. `--screenshot ... --requirements ...`) instead of degrading to Question mode.
 - `/gm-evaluate` Phase 4 must populate `phase4_review` with at least one `{category, verdict}` entry (categories picked per game) so the gameplay-reasoning step can no longer be silently skipped; `gameplay_issues` remains as a flat mirror for `/gm-fixgap`.
 - `SCENES.md` template carries a per-scene `Acceptance criteria` block; the decomposer populates it from PLAN tag mechanics and `/gm-evaluate` pastes it verbatim into the visual-qa `Verify:` field.
+- gecs `patterns.md` documents the pure-static helper convention (`*_math.gd` / `*_logic.gd` next to a System) and the `simulate_*` static seam on Systems — both used as the shared entry point for unit tests and e2e drivers.
+- `worker-dispatch.md` "When to parallelize" now includes a batch design rule: inspect every pending task's Affected files and group disjoint sets up to 3-wide, rather than dispatching task-by-task.
 
 ## Fixed
 
