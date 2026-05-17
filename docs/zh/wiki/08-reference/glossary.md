@@ -42,7 +42,7 @@ GodotMaker 文档和斜线指令输出中常见术语的定义。
 
 **SCENES.md** — 由 `/gm-gdd` 生成的规划文档，列出 **当前 tag** 需要新增或重做的 Godot 场景、包含的内容以及场景之间的关系。先前 tag 的场景描述保留在对应的 `docs/tags/<prev>/SCENES.md` 归档里。
 
-**Skill**（Claude Code 技能）— 一个给 Claude Code 提供特定工作指令的 Markdown 文件（`SKILL.md`）。GodotMaker 提供 9 个流水线角色技能（`/gm-*`）、1 个主流程外的诊断技能（`/gm-rescue`）、12 个辅助技能以及 8 个 Reviewer 技能。技能被部署到生成项目内的 `.claude/skills/`。
+**Skill**（coding-agent 技能）— 一个给所选 coding agent 提供特定工作指令的 Markdown 文件（`SKILL.md`）。GodotMaker 提供 9 个流水线角色技能（Claude Code 使用 `/gm-*`，Codex 使用 `$gm-*`）、辅助技能以及 Reviewer 技能。技能会部署到所选 agent 的项目本地技能目录（Claude Code 为 `.claude/skills/`，Codex 为 `.agents/skills/`）。
 
 **Stage vs Role** — "Stage"是 GodotMaker 早期对流水线步骤的称呼。流水线已被重新设计为基于角色的指令，没有中央协调器。"stage"这个词仍出现在部分文件名中（如 `stage_schemas.json`、`stage.jsonl`），但今后的规范术语是"role"。另见：*Role*。
 

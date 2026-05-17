@@ -42,7 +42,7 @@ Scripts and the events they handle:
 | `check_worker_report.py` | Called by on_subagent_stop.py | Yes |
 | `check_completion.py` | Stop | Yes |
 
-Hook registration (which script fires on which event) lives in `config/settings.json` and is deployed into the target project as `.claude/settings.json`.
+Hook registration (which script fires on which event) lives in `config/settings.json` and is deployed into Claude Code targets as `.claude/settings.json`.
 
 ### hooks/metrics/
 
@@ -148,12 +148,12 @@ Python CLI scripts that contributors and users run directly.
 When you run `python tools/publish.py <target>`:
 
 1. Read `VERSION` from the repo root and compare against `<target>/.godotmaker/version`. Prompt or block on MINOR / MAJOR upgrades.
-2. Copy skills (flat): all directories under `skills/core/` and `skills/reviewer/` → `<target>/.claude/skills/`. Directories whose name starts with `_` (i.e., `_shared/`) are skipped by `publish_skills()`; shared docs are deployed into consumer `references/` folders instead by `publish_shared_refs()`.
-3. Copy hooks → `<target>/.godotmaker/hooks/`.
-4. Copy tools → `<target>/tools/`.
-5. Copy templates → `<target>/.claude/templates/`.
-6. Copy `config/stage_schemas.json` → `<target>/.godotmaker/stage_schemas.json`.
-7. On fresh install (or `--force`): write `.claude/settings.json`, initialize `CLAUDE.md`, prompt for `godotmaker.yaml`.
+2. Copy skills (flat): all directories under `skills/core/` and `skills/reviewer/` to the selected agent skill directory (`<target>/.claude/skills/` for Claude Code or `<target>/.agents/skills/` for Codex). Directories whose name starts with `_` (i.e., `_shared/`) are skipped by `publish_skills()`; shared docs are deployed into consumer `references/` folders instead by `publish_shared_refs()`.
+3. Copy hooks to `<target>/.godotmaker/hooks/`.
+4. Copy tools to `<target>/tools/`.
+5. Copy templates to the selected agent template directory.
+6. Copy `config/stage_schemas.json` to `<target>/.godotmaker/stage_schemas.json`.
+7. On fresh install (or `--force`): write agent-specific instructions (`CLAUDE.md` or `AGENTS.md`), prompt for `godotmaker.yaml`, and for Claude Code targets write `.claude/settings.json`.
 8. Stamp `<target>/.godotmaker/version` with the current version.
 
 ---
@@ -172,7 +172,7 @@ When you run `python tools/publish.py <target>`:
 
 ## templates/
 
-Markdown document templates that `publish.py` deploys into new game projects under `.claude/templates/`. The role skills fill these in during their work. Templates include: `GDD.md`, `PLAN.md`, `STRUCTURE.md`, `SCENES.md`, `ASSETS.md`, `GAP.md`, `MEMORY.md`, `TOC.md`, `game-claude.md`.
+Markdown document templates that `publish.py` deploys into new game projects under the selected agent template directory. The role skills fill these in during their work. Templates include: `GDD.md`, `PLAN.md`, `STRUCTURE.md`, `SCENES.md`, `ASSETS.md`, `GAP.md`, `MEMORY.md`, `TOC.md`, `game-claude.md`.
 
 ---
 

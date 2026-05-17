@@ -71,7 +71,7 @@ python -m pytest tests/ -k "test_blocks_missing_sections" -x -q
    ```
 
 3. 在 Claude Code 中打开该项目目录，执行相关的 `/gm-*` 命令。
-4. 检查输出（`.godotmaker/`、`PLAN.md`、`.claude/skills/` 下的技能文件等），确认行为符合预期。
+4. 检查输出（`.godotmaker/`、`PLAN.md`、所选 agent 技能目录下的技能文件等），确认行为符合预期。
 
 对同一版本重复发布始终被允许，因此在开发阶段无需每次都提升版本号。
 

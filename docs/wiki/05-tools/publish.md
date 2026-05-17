@@ -4,10 +4,18 @@
 
 ## Fresh install
 
-Point `publish.py` at an empty folder (or an existing Godot project folder). It will create everything it needs:
+Point `publish.py` at an empty folder (or an existing Godot project folder). Choose the coding agent you want to use for that project:
 
 ```bash
+# Claude Code
 python tools/publish.py /path/to/my-game
+cd /path/to/my-game
+claude
+
+# Codex
+python tools/publish.py --agent codex /path/to/my-game
+cd /path/to/my-game
+codex
 ```
 
 On Windows:
@@ -18,7 +26,7 @@ python tools\publish.py C:\Games\my-game
 
 The first time you run this, the script will ask you for the full path to your Godot executable. Enter it when prompted — you only need to do this once per project.
 
-**What gets created:**
+**What gets created for Claude Code:**
 
 | Location | What it is |
 |----------|------------|
@@ -34,7 +42,40 @@ The first time you run this, the script will ask you for the full path to your G
 | `CLAUDE.md` | Per-project instructions that Claude Code reads at the start of every session |
 | `assets/sprites`, `assets/audio`, `assets/fonts`, `assets/ui`, `references/` | Standard asset folders |
 
-The script also registers the `godot-mcp` server (which lets Claude Code talk to the Godot editor), initializes a git repository if one doesn't exist, and creates a `.gitignore` with the right entries.
+The script also registers the `godot-mcp` server for the selected agent (Claude
+Code via `claude mcp`, Codex via `codex mcp`), initializes a git repository if
+one doesn't exist, and creates a `.gitignore` with the right entries. For Codex,
+MCP registration is required because the GodotMaker runtime depends on the
+Godot MCP tools.
+
+When published with `--agent codex`, the agent-owned files use the Codex
+layout instead: skills go under `.agents/skills/`, templates/config under
+`.agents/`, `godotmaker.yaml` is stored at `.agents/godotmaker.yaml`, and
+`AGENTS.md` is created instead of `CLAUDE.md`. Shared framework state still
+lives under `.godotmaker/`. Codex approval and sandbox policy are handled by
+Codex at runtime; publish does not create a `.agents/settings.json` equivalent.
+
+### Codex permissions
+
+Codex permissions are controlled by the Codex host process, not by files that
+`publish.py` writes into the project. A full GodotMaker pipeline may need to
+write Git state, create or use isolated workspaces, and let Godot write its
+default user data / log files. For unattended runs, start Codex with full host
+permissions equivalent to Claude Code's `--dangerously-skip-permissions`.
+
+For direct CLI automation, use the Codex full-bypass mode provided by the runner
+or by your own command wrapper. For remote-control sessions, permissions are set
+when the local host process starts; the mobile app cannot raise them after it
+connects. Start the host like this when you intend to run the full pipeline from
+remote control:
+
+```powershell
+codex.cmd remote-control -c sandbox_mode='"danger-full-access"' -c approval_policy='"never"'
+```
+
+`workspace-write` plus `--add-dir` can be used for narrower manual experiments,
+but it is not the baseline unattended mode because Godot's default log directory
+and sibling worktrees can be outside the project root.
 
 ## Upgrading an existing project
 
@@ -60,26 +101,27 @@ For the full upgrade policy and migration script details, see [`../../versioning
 
 ```bash
 python tools/publish.py --force /path/to/my-game
+python tools/publish.py --agent codex --force /path/to/my-game
 ```
 
 `--force` does four things at once:
 
-1. Clears `.claude/skills/` before re-deploying, removing any skills left over from a previous version.
-2. Overwrites `.claude/settings.json` even if you've already customized it.
+1. Clears the selected agent's skill directory before re-deploying, removing any skills left over from a previous version.
+2. For Claude Code publishes, overwrites `.claude/settings.json` even if you've already customized it.
 3. Skips the confirmation prompts for minor and major upgrades.
 4. Allows downgrades.
 
-For **major** upgrades with `--force`, the clean-up is more thorough: `.claude/skills/`, `.claude/agents/`, `.claude/config/`, `.claude/templates/`, `.godotmaker/hooks/`, `tools/`, and the runtime state files are all wiped and rebuilt from scratch.
+For **major** upgrades with `--force`, the clean-up is more thorough: the selected agent's `skills/`, `agents/`, `config/`, and `templates/` folders, `.godotmaker/hooks/`, `tools/`, and the runtime state files are all wiped and rebuilt from scratch.
 
 ## What is preserved on upgrade
 
-These files are never overwritten by a normal publish (only `--force` can change `settings.json`):
+These files are never overwritten by a normal publish (only `--force` can change Claude Code's `settings.json`):
 
 | File | Why it is kept |
 |------|---------------|
-| `CLAUDE.md` | You may have added project-specific instructions |
+| `CLAUDE.md` / `AGENTS.md` | You may have added project-specific instructions |
 | `.claude/settings.json` | You may have adjusted hook behavior |
-| `.claude/godotmaker.yaml` | Contains your machine-specific Godot path |
+| `.claude/godotmaker.yaml` / `.agents/godotmaker.yaml` | Contains your machine-specific Godot path |
 | `.godotmaker/config.yaml` | Contains your project-specific preferences |
 
 Your game code, scenes, assets, and planning documents (`GDD.md`, `PLAN.md`, etc.) are not touched by publish — it only manages the framework layer.

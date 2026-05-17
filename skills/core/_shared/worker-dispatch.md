@@ -114,11 +114,15 @@ A typical `/gm-build` cycle runs as 3–6 batches: each batch is "dispatch paral
 
 ### Before dispatch — snapshot the working tree
 
-If `git status --porcelain` is non-empty in the project root, run `git add -A && git commit -m "wip: parallel dispatch snapshot"` before sending any `isolation: "worktree"` Agent call.
+Before sending any isolated worker call, detect whether the current checkout is
+a normal branch, an existing worktree, detached HEAD, or a host-managed sandbox.
+If a clean snapshot is required but cannot be created safely, do not dispatch
+parallel workers; use sequential worker briefs or fail before the stage starts.
 
 ### How to dispatch
 
-Use the Agent tool with `isolation: "worktree"` for each parallel worker:
+For runtimes that support it, use the delegated agent tool with isolated
+workspace support for each parallel worker:
 
 ```
 Agent({
@@ -138,7 +142,8 @@ Agent({
 })
 ```
 
-Send **both Agent calls in the same message** — this is what triggers parallel execution.
+Send **both Agent calls in the same message** when the runtime uses batched
+calls to trigger parallel execution.
 
 ### Merge procedure after parallel workers complete
 

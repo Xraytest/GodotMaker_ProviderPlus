@@ -277,7 +277,7 @@ python tools/asset_gen.py
 python tools/publish.py --force <target>
 ```
 
-Note that `--force` overwrites `.claude/settings.json` in your game project. Back it up if you have customized it.
+Note that for Claude Code targets, `--force` overwrites `.claude/settings.json` in your game project. Back it up if you have customized it.
 
 ---
 

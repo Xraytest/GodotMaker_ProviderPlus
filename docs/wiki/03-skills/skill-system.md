@@ -18,7 +18,7 @@ For the full list and examples of what each reviewer catches, see [Reviewer skil
 
 ## How skills are deployed
 
-Skills live in this repository under `skills/core/` and `skills/reviewer/`. When you run `python tools/publish.py <project>`, they are copied into `<project>/.claude/skills/` where Claude Code can find them automatically.
+Skills live in this repository under `skills/core/` and `skills/reviewer/`. When you run `python tools/publish.py <project>`, they are copied into `<project>/.claude/skills/` where Claude Code can find them automatically. When you run `python tools/publish.py --agent codex <project>`, publish writes the same shared GodotMaker skills into `<project>/.agents/skills/` and adds Codex runtime mapping references so Codex can interpret Claude-first surface vocabulary such as `.claude/...` paths and `/gm-*` commands.
 
 Reference documents that are used by more than one skill (such as the worker dispatch protocol) have a single source-of-truth copy in `skills/core/_shared/`. The publish step deploys each shared file into every consumer skill's `references/` folder. If you are contributing to GodotMaker and need to edit a shared document, always edit the source in `_shared/` — the deployed copies are auto-generated and will be overwritten.
 

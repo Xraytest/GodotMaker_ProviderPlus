@@ -1,6 +1,6 @@
 # 编写技能
 
-技能是告诉 Claude 在流水线每个阶段应该做什么的指令包。一个技能是一个文件夹，其中包含一个 `SKILL.md` prompt、可选的 `references/` 文档以及可选的辅助文件。当 `publish.py` 运行时，每个技能都会被扁平复制到目标项目的 `.claude/skills/` 文件夹，Claude Code 会自动加载它们。
+技能是告诉所选 coding agent 在流水线每个阶段应该做什么的指令包。一个技能是一个文件夹，其中包含一个 `SKILL.md` prompt、可选的 `references/` 文档以及可选的辅助文件。当 `publish.py` 运行时，每个技能都会被扁平复制到所选 agent 的项目本地技能目录（Claude Code 为 `.claude/skills/`，Codex 为 `.agents/skills/`）。
 
 ## 我在写哪种技能？
 

@@ -17,6 +17,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "tools" / "run_verify.py"
+sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 
 def _load_run_verify():
@@ -254,20 +255,30 @@ def test_check_static_timeout_is_error():
 # ---------- godot_path resolution ----------
 
 def test_read_godot_path_returns_configured_value(project_dir: Path):
-    assert run_verify._read_godot_path(project_dir) == "/usr/bin/godot"
+    assert run_verify.read_godot_path(project_dir, default="godot") == "/usr/bin/godot"
 
 
 def test_read_godot_path_falls_back_to_godot_when_missing(tmp_path: Path):
     """SKILL says fall back to plain 'godot' when the yaml is absent."""
     (tmp_path / ".godotmaker").mkdir()
-    assert run_verify._read_godot_path(tmp_path) == "godot"
+    assert run_verify.read_godot_path(tmp_path, default="godot") == "godot"
 
 
 def test_read_godot_path_falls_back_when_field_empty(tmp_path: Path):
     (tmp_path / ".godotmaker").mkdir()
     (tmp_path / ".claude").mkdir()
     (tmp_path / ".claude" / "godotmaker.yaml").write_text("godot_path: \n")
-    assert run_verify._read_godot_path(tmp_path) == "godot"
+    assert run_verify.read_godot_path(tmp_path, default="godot") == "godot"
+
+
+def test_read_godot_path_uses_codex_runtime_config(tmp_path: Path):
+    (tmp_path / ".godotmaker").mkdir()
+    (tmp_path / ".godotmaker" / "config.yaml").write_text("agent: codex\n")
+    (tmp_path / ".agents").mkdir()
+    (tmp_path / ".agents" / "godotmaker.yaml").write_text(
+        "godot_path: /opt/codex-godot\n"
+    )
+    assert run_verify.read_godot_path(tmp_path, default="godot") == "/opt/codex-godot"
 
 
 # ---------- build_report composition ----------

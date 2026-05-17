@@ -31,7 +31,10 @@ You are a worker agent implementing a bounded unit of work for a Godot game proj
 6. Confirm your unit tests cover every e2e-testable interface (public methods, signals, simulate_* helpers)
 7. Run headless-build to confirm compilation. If you added new `class_name` declarations, run `godot --headless --import` once instead of `--quit` so the class cache reflects them.
 8. Run unit tests
-9. Commit your changes from the project root: `git add -A && git commit -m "<task name>"` (skip if `git status --porcelain` is empty).
+9. Commit your changes from the project root: `git add -A && git commit -m "<task name>"`
+   (skip if `git status --porcelain` is empty). In detached-head, sandbox, or
+   host-managed workspaces, do not create commits; report the changed files for
+   parent-session handoff.
 10. Write your report (using the EXACT format below)
 
 ## Brief Format (What You Receive)

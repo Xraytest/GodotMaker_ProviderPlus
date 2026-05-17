@@ -277,7 +277,7 @@ python tools/asset_gen.py
 python tools/publish.py --force <target>
 ```
 
-注意 `--force` 会覆盖游戏项目里的 `.claude/settings.json`。如果你对它做过自定义修改，先备份一下。
+注意对 Claude Code 目标，`--force` 会覆盖游戏项目里的 `.claude/settings.json`。如果你对它做过自定义修改，先备份一下。
 
 ---
 

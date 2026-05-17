@@ -37,6 +37,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from agent_runtime import godotmaker_yaml, read_godot_path
+
 
 # Same flags as gm-verify/SKILL.md Section 4. `--all` deliberately not
 # used: it adds `--e2e` which is the Evaluator's territory.
@@ -52,25 +54,6 @@ STATIC_TIMEOUT = 60
 
 def _resolve_project_path(arg: str | None) -> Path:
     return Path(arg).resolve() if arg else Path.cwd()
-
-
-def _read_godot_path(project_dir: Path) -> str:
-    """Read `godot_path` from `.claude/godotmaker.yaml`.
-
-    Falls back to plain `"godot"` (PATH lookup) when the file or field
-    is missing, matching gm-verify/SKILL.md "Resolve `godot` binary"
-    behaviour. A subsequent FileNotFoundError from subprocess surfaces
-    the misconfiguration via a tooling_note.
-    """
-    config = project_dir / ".claude" / "godotmaker.yaml"
-    if not config.exists():
-        return "godot"
-    for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("godot_path:"):
-            val = stripped.split(":", 1)[1].strip().strip('"').strip("'")
-            return val or "godot"
-    return "godot"
 
 
 def _now_iso_utc() -> str:
@@ -135,7 +118,7 @@ def check_build(godot_path: str, project_dir: Path
                 crashed_on=godot_path,
                 error=(
                     f"godot binary not found: {ex}. Set godot_path in "
-                    f".claude/godotmaker.yaml or ensure godot is on PATH."
+                    f"{godotmaker_yaml(project_dir)} or ensure godot is on PATH."
                 ),
             ),
         )
@@ -318,7 +301,7 @@ def check_static(project_dir: Path) -> tuple[dict, dict | None]:
 # ---------------------------------------------------------------------------
 
 def build_report(project_dir: Path) -> dict[str, Any]:
-    godot_path = _read_godot_path(project_dir)
+    godot_path = read_godot_path(project_dir, default="godot")
 
     build_dict, build_note = check_build(godot_path, project_dir)
     unit_dict, unit_note = check_unit_tests(godot_path, project_dir)

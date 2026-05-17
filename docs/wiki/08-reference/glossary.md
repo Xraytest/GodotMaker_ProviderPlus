@@ -42,7 +42,7 @@ Definitions for terms you'll see across the GodotMaker docs and slash-command ou
 
 **SCENES.md** — A planning document produced by `/gm-gdd` that lists every Godot scene the game needs, what it contains, and how scenes relate to each other. The build role uses this when implementing the scene tree layout.
 
-**Skill** (Claude Code skill) — A markdown file (`SKILL.md`) that gives Claude Code a set of instructions for a specific job. GodotMaker ships 9 role skills (the `/gm-*` commands), 12 supporting skills (reference docs and helpers), and 8 reviewer skills. Skills are deployed into `.claude/skills/` inside the generated project. Users invoke role skills by typing the slash command; supporting and reviewer skills are called internally by the role skills.
+**Skill** (coding-agent skill) — A markdown file (`SKILL.md`) that gives the selected coding agent a set of instructions for a specific job. GodotMaker ships 9 role skills (the `/gm-*` commands for Claude Code, `$gm-*` for Codex), 12 supporting skills (reference docs and helpers), and 8 reviewer skills. Skills are deployed into the selected agent's project-local skill directory (`.claude/skills/` for Claude Code or `.agents/skills/` for Codex). Users invoke role skills by typing the agent-specific command; supporting and reviewer skills are called internally by the role skills.
 
 **Stage vs Role** — "Stage" was the original GodotMaker term for a pipeline step, and references to an "8-stage pipeline" described the first architecture. The pipeline has been redesigned as 9 role-based commands with no central orchestrator. The word "stage" may still appear in some file names (e.g., `stage_schemas.json`, `stage.jsonl`) and older docs, but the canonical term going forward is "role." See also: *Role*.
 

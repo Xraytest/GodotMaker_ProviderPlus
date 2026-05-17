@@ -12,8 +12,8 @@ Usage:
 gm-scaffold's Step 4 verifies (project.godot shape, required addon
 directories, godot-e2e plugin, e2e/conftest.py, git HEAD, headless
 parse). The headless step is automatically skipped with a WARN when
-`.claude/godotmaker.yaml` lacks `godot_path`, so offline / partially
-configured projects still get a meaningful overall result.
+the selected agent's `godotmaker.yaml` lacks `godot_path`, so offline /
+partially configured projects still get a meaningful overall result.
 """
 import argparse
 import os
@@ -21,6 +21,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+from agent_runtime import godotmaker_yaml, read_godot_path
 
 PLACEHOLDER_KEYWORDS = ["placeholder", "todo", "stub", "not implemented"]
 
@@ -66,27 +68,6 @@ def find_gd_files(project_dir: Path, pattern: str) -> list[Path]:
 SCAFFOLD_REQUIRED_ADDONS = ("gecs", "gdUnit4", "godot_e2e")
 
 
-def _read_godot_path(project_dir: Path) -> str | None:
-    """Read `godot_path` from `<project>/.claude/godotmaker.yaml`.
-
-    Returns None when the file is missing or the value is empty / blank,
-    so callers can decide whether to skip the headless check or fail.
-    Distinct from `tools/publish.py:read_godot_path`, which takes a
-    config-file path directly and falls back to `"godot"` for caller
-    convenience (used by register_mcp); here we surface the missing
-    state instead so check_build can WARN explicitly.
-    """
-    config = project_dir / ".claude" / "godotmaker.yaml"
-    if not config.exists():
-        return None
-    for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("godot_path:"):
-            val = stripped.split(":", 1)[1].strip().strip('"').strip("'")
-            return val or None
-    return None
-
-
 def _run_headless_godot(godot_path: str, project_dir: Path
                         ) -> tuple[int, str]:
     """Run `<godot_path> --headless --path <project> --quit` and return
@@ -112,7 +93,7 @@ def check_build(project_dir: Path, result: CheckResult):
       4. e2e/conftest.py imports GodotE2E.
       5. .git/ resolves HEAD (worker worktree isolation requires it).
       6. `<godot_path> --headless --quit` exits 0 with no ERROR lines.
-         When `.claude/godotmaker.yaml` lacks `godot_path` this step
+         When the selected agent's `godotmaker.yaml` lacks `godot_path` this step
          emits a WARN (not a FAIL) and skips the subprocess, so
          offline / partially configured projects still get an overall
          result.
@@ -175,10 +156,11 @@ def check_build(project_dir: Path, result: CheckResult):
             result.warn("git rev-parse timed out — check the repo manually")
 
     # 6. Headless parse
-    godot_path = _read_godot_path(project_dir)
+    godot_path = read_godot_path(project_dir)
+    config_path = godotmaker_yaml(project_dir)
     if not godot_path:
         result.warn(
-            "godot_path missing from .claude/godotmaker.yaml — "
+            f"godot_path missing from {config_path} — "
             "skipping headless parse check (re-run publish to set it)"
         )
         return
@@ -186,7 +168,7 @@ def check_build(project_dir: Path, result: CheckResult):
         rc, output = _run_headless_godot(godot_path, project_dir)
     except FileNotFoundError:
         result.fail(f"godot executable not found at {godot_path!r} — "
-                    "fix .claude/godotmaker.yaml or re-run publish")
+                    f"fix {config_path} or re-run publish")
         return
     except subprocess.TimeoutExpired:
         result.fail("godot --headless --quit did not finish within 60s")

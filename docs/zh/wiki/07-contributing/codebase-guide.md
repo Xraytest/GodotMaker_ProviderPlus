@@ -42,7 +42,7 @@ GodotMaker/
 | `check_worker_report.py` | 由 on_subagent_stop.py 调用 | 是 |
 | `check_completion.py` | Stop | 是 |
 
-Hook 注册关系（哪个脚本响应哪个事件）存储在 `config/settings.json` 中，发布时会被部署到目标项目的 `.claude/settings.json`。
+Hook 注册关系（哪个脚本响应哪个事件）存储在 `config/settings.json` 中，发布到 Claude Code 目标时会部署为 `.claude/settings.json`。
 
 ### hooks/metrics/
 
@@ -148,12 +148,12 @@ manifest 的 schema、添加/移除流程和调试技巧见 `docs/contributing/s
 运行 `python tools/publish.py <target>` 时：
 
 1. 从仓库根目录读取 `VERSION`，与 `<target>/.godotmaker/version` 比较。MINOR / MAJOR 升级时弹出提示或直接拦截。
-2. 扁平复制技能：`skills/core/` 和 `skills/reviewer/` 下的所有目录 → `<target>/.claude/skills/`。名称以 `_` 开头的目录（即 `_shared/`）会被 `publish_skills()` 跳过；共享文档改由 `publish_shared_refs()` 部署到消费技能的 `references/` 文件夹中。
+2. 扁平复制技能：`skills/core/` 和 `skills/reviewer/` 下的所有目录会写入所选 agent 的技能目录（Claude Code 为 `<target>/.claude/skills/`，Codex 为 `<target>/.agents/skills/`）。名称以 `_` 开头的目录（即 `_shared/`）会被 `publish_skills()` 跳过；共享文档改由 `publish_shared_refs()` 部署到消费技能的 `references/` 文件夹中。
 3. 复制 hooks → `<target>/.godotmaker/hooks/`。
 4. 复制 tools → `<target>/tools/`。
-5. 复制 templates → `<target>/.claude/templates/`。
+5. 复制 templates 到所选 agent 的模板目录。
 6. 复制 `config/stage_schemas.json` → `<target>/.godotmaker/stage_schemas.json`。
-7. 首次安装（或使用 `--force`）时：写入 `.claude/settings.json`，初始化 `CLAUDE.md`，提示配置 `godotmaker.yaml`。
+7. 首次安装（或使用 `--force`）时：写入对应 agent 的项目指令文件（`CLAUDE.md` 或 `AGENTS.md`），提示配置 `godotmaker.yaml`；Claude Code 目标还会写入 `.claude/settings.json`。
 8. 将当前版本号写入 `<target>/.godotmaker/version`。
 
 ---
@@ -172,7 +172,7 @@ manifest 的 schema、添加/移除流程和调试技巧见 `docs/contributing/s
 
 ## templates/
 
-Markdown 文档模板，由 `publish.py` 部署到新游戏项目的 `.claude/templates/` 下。角色技能在工作过程中填充这些模板。模板包括：`GDD.md`、`PLAN.md`、`STRUCTURE.md`、`SCENES.md`、`ASSETS.md`、`GAP.md`、`MEMORY.md`、`TOC.md`、`game-claude.md`。
+Markdown 文档模板，由 `publish.py` 部署到新游戏项目的所选 agent 模板目录下。角色技能在工作过程中填充这些模板。模板包括：`GDD.md`、`PLAN.md`、`STRUCTURE.md`、`SCENES.md`、`ASSETS.md`、`GAP.md`、`MEMORY.md`、`TOC.md`、`game-claude.md`。
 
 ---
 

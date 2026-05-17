@@ -71,7 +71,7 @@ When you want to verify your change end-to-end:
    ```
 
 3. Open the project folder in Claude Code and exercise the relevant `/gm-*` command.
-4. Inspect the outputs (`.godotmaker/`, `PLAN.md`, skill files under `.claude/skills/`, etc.) to confirm behaviour.
+4. Inspect the outputs (`.godotmaker/`, `PLAN.md`, skill files under the selected agent skill directory, etc.) to confirm behaviour.
 
 Re-publishing the same version is always allowed, so you can iterate without bumping the version number during development.
 

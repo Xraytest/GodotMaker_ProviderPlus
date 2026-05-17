@@ -160,6 +160,21 @@ class TestBuildCheck:
         assert "[WARN]" in stdout
         assert code == 0  # static checks all passed → overall pass
 
+    def test_codex_build_check_uses_agents_godotmaker_yaml(self, project_dir):
+        _seed_scaffolded_project(project_dir)
+        os.makedirs(os.path.join(project_dir, ".godotmaker"), exist_ok=True)
+        os.makedirs(os.path.join(project_dir, ".agents"), exist_ok=True)
+        with open(os.path.join(project_dir, ".godotmaker", "config.yaml"), "w", encoding="utf-8") as f:
+            f.write("agent: codex\n")
+        with open(os.path.join(project_dir, ".agents", "godotmaker.yaml"), "w", encoding="utf-8") as f:
+            f.write("godot_path: definitely-missing-godot-exe\n")
+
+        stdout, code = run_check(project_dir, "--build")
+
+        assert code == 1
+        assert "godot executable not found" in stdout
+        assert ".agents" in stdout
+
 
 class TestEcsCheck:
     def test_no_gecs_addon(self, project_dir):

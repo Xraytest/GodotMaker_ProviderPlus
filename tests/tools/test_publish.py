@@ -1,5 +1,8 @@
 """Tests for publish.py."""
+import json
 import os
+from pathlib import Path
+import re
 import stat
 import subprocess
 import sys
@@ -12,21 +15,108 @@ sys.path.insert(0, os.path.join(
     "tools",
 ))
 
-import json
-
 import publish
+import agent_runtime
 from publish import (
     read_godot_path,
     create_godotmaker_yaml,
     create_project_config,
+    deploy_agent_instructions,
+    render_agent_instructions,
+    ensure_gitattributes,
     ensure_gitignore,
     ensure_worktreeinclude,
     publish_skills,
+    register_codex_mcp,
     register_godot_permissions,
     rmtree_force,
     _verify_godot_path,
     DEFAULT_CONFIG_TEMPLATE,
 )
+
+
+PRIMARY_ROLE_SKILLS = [
+    "gm-scaffold",
+    "gm-gdd",
+    "gm-asset",
+    "gm-build",
+    "gm-verify",
+    "gm-evaluate",
+    "gm-fixgap",
+    "gm-accept",
+    "gm-finalize",
+]
+
+CODEX_RUNTIME_TEXT_SUFFIXES = {
+    ".md",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".sh",
+    ".ps1",
+    ".txt",
+    ".tmpl",
+}
+
+FORBIDDEN_CODEX_RUNTIME_REFS = [
+    ".claude/skills",
+    ".claude/agents",
+    ".claude/templates",
+    ".claude/godotmaker.yaml",
+    "CLAUDE.md",
+    "${CLAUDE_SKILL_DIR}",
+]
+
+LITERAL_SLASH_GM_EXECUTION = re.compile(
+    r"\b(?:run|invoke|execute|call|use|start|launch)\s+`/gm-[^`]+`",
+    re.IGNORECASE,
+)
+
+
+def _runtime_text_files(root: Path):
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in CODEX_RUNTIME_TEXT_SUFFIXES:
+            yield path, path.read_text(encoding="utf-8")
+
+
+def _publish_codex_project(tmp_path, monkeypatch):
+    from _version import SemVer
+
+    target = tmp_path / "target"
+    config_dir = target / ".agents"
+    config_dir.mkdir(parents=True)
+    (config_dir / "godotmaker.yaml").write_text(
+        'godot_path: "/test/godot"\n',
+        encoding="utf-8",
+    )
+
+    codex_mcp_calls = []
+
+    def _record_codex_mcp(*args, **kwargs):
+        codex_mcp_calls.append((args, kwargs))
+        return True
+
+    monkeypatch.setattr(
+        publish,
+        "check_version_upgrade",
+        lambda *_args, **_kwargs: (True, "FRESH", None, SemVer(0, 3, 5)),
+    )
+    monkeypatch.setattr(publish, "register_codex_mcp", _record_codex_mcp)
+    monkeypatch.setattr(publish, "register_mcp",
+                        lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(publish, "register_godot_permissions",
+                        lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(publish, "ensure_git_repo",
+                        lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(publish, "baseline_applied",
+                        lambda *_args, **_kwargs: 0)
+    monkeypatch.setattr(publish, "run_migrations",
+                        lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(sys, "argv",
+                        ["publish.py", "--agent", "codex", "--force", str(target)])
+
+    publish.main()
+    return target, codex_mcp_calls
 
 
 class TestReadGodotPath:
@@ -150,6 +240,13 @@ class TestCreateGodotmakerYaml:
     def test_strips_quotes_from_user_input(self, tmp_path):
         config = tmp_path / "godotmaker.yaml"
         with patch("builtins.input", return_value='"C:/Godot/godot.exe"'), \
+             patch.object(publish.subprocess, "run", return_value=_ok_run()):
+            create_godotmaker_yaml(config)
+        assert 'godot_path: "C:/Godot/godot.exe"' in config.read_text(encoding="utf-8")
+
+    def test_strips_bom_from_piped_input(self, tmp_path):
+        config = tmp_path / "godotmaker.yaml"
+        with patch("builtins.input", return_value="\ufeffC:/Godot/godot.exe"), \
              patch.object(publish.subprocess, "run", return_value=_ok_run()):
             create_godotmaker_yaml(config)
         assert 'godot_path: "C:/Godot/godot.exe"' in config.read_text(encoding="utf-8")
@@ -288,12 +385,48 @@ class TestRegisterGodotPermissions:
         assert len(allow) == 1
 
 
+class TestRegisterCodexMcp:
+    def test_fails_when_codex_missing(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(publish.shutil, "which", lambda name: None)
+        assert register_codex_mcp(tmp_path, "/usr/bin/godot") is False
+        out = capsys.readouterr().out
+        assert "codex CLI not found" in out
+        assert "codex mcp add godot" in out
+
+    def test_invokes_codex_mcp_add(self, tmp_path, monkeypatch):
+        calls = []
+
+        def _which(name):
+            if name in ("codex", "npx"):
+                return name
+            return None
+
+        def _run(cmd, **kwargs):
+            calls.append((cmd, kwargs))
+            return subprocess.CompletedProcess(args=cmd, returncode=0)
+
+        monkeypatch.setattr(publish.shutil, "which", _which)
+        monkeypatch.setattr(publish.subprocess, "run", _run)
+        monkeypatch.setattr(publish.sys, "platform", "linux")
+
+        assert register_codex_mcp(tmp_path, "/usr/bin/godot") is True
+
+        assert calls[0][0] == ["codex", "mcp", "remove", "godot"]
+        assert calls[1][0] == [
+            "codex", "mcp", "add", "godot",
+            "--env", "GODOT_PATH=/usr/bin/godot", "--",
+            "npx", "@coding-solo/godot-mcp",
+        ]
+        assert calls[1][1]["cwd"] == str(tmp_path)
+
+
 class TestCreateProjectConfig:
     def test_creates_config_with_defaults(self, tmp_path):
         create_project_config(tmp_path)
         config = tmp_path / ".godotmaker" / "config.yaml"
         assert config.exists()
         content = config.read_text()
+        assert "agent: claude-code" in content
         assert "vqa_model: gemini-2.5-flash" in content
         assert "asset_image_provider: gemini" in content
         assert "gemini_image_model: gemini-3.1-flash-image-preview" in content
@@ -305,8 +438,23 @@ class TestCreateProjectConfig:
         config_dir.mkdir()
         config = config_dir / "config.yaml"
         config.write_text("vqa_model: custom-model\n")
-        create_project_config(tmp_path)
-        assert config.read_text() == "vqa_model: custom-model\n"
+        create_project_config(tmp_path, publish.AGENT_CODEX)
+        content = config.read_text()
+        assert "vqa_model: custom-model" in content
+        assert "agent: codex" in content
+
+    def test_published_agent_selects_runtime_config(self, tmp_path):
+        create_project_config(tmp_path, publish.AGENT_CODEX)
+        (tmp_path / ".agents").mkdir()
+        (tmp_path / ".agents" / "godotmaker.yaml").write_text(
+            "godot_path: /opt/godot\n", encoding="utf-8"
+        )
+
+        assert agent_runtime.detect_agent(tmp_path) == publish.AGENT_CODEX
+        assert agent_runtime.godotmaker_yaml(tmp_path) == (
+            tmp_path / ".agents" / "godotmaker.yaml"
+        )
+        assert agent_runtime.read_godot_path(tmp_path) == "/opt/godot"
 
     def test_default_config_template_is_valid_yaml(self):
         assert DEFAULT_CONFIG_TEMPLATE.exists(), "config.yaml.default template must exist"
@@ -317,6 +465,7 @@ class TestCreateProjectConfig:
         assert "grok_image_model:" in content
         assert "grok_video_model:" in content
         assert "worker_model:" in content
+        assert "agent:" in content
         lines = [line for line in content.splitlines() if line and not line.startswith("#")]
         for line in lines:
             assert ":" in line, f"Non-comment line missing ':' — {line}"
@@ -335,6 +484,7 @@ class TestEnsureGitignore:
         ensure_gitignore(tmp_path)
         content = (tmp_path / ".gitignore").read_text()
         assert ".claude/" in content
+        assert ".agents/" not in content
         for entry in SELECTIVE_ENTRIES:
             assert entry in content
         # Blanket ignore must NOT be present (selective entries only)
@@ -348,6 +498,7 @@ class TestEnsureGitignore:
         content = gi.read_text()
         assert "*.pyc" in content
         assert ".claude/" in content
+        assert ".agents/" not in content
         for entry in SELECTIVE_ENTRIES:
             assert entry in content
         # Blanket ignore must NOT be present
@@ -372,6 +523,25 @@ class TestEnsureGitignore:
             assert entry in content
         assert content.count(".claude/") == 1
 
+    def test_codex_does_not_ignore_agents_or_claude(self, tmp_path):
+        ensure_gitignore(tmp_path, publish.AGENT_CODEX)
+        content = (tmp_path / ".gitignore").read_text()
+        assert ".agents/" not in content
+        assert ".claude/" not in content
+        for entry in SELECTIVE_ENTRIES[1:]:
+            assert entry in content
+
+    def test_codex_removes_old_agents_blanket_ignore(self, tmp_path):
+        gi = tmp_path / ".gitignore"
+        gi.write_text(".agents/\n*.tmp\n")
+        ensure_gitignore(tmp_path, publish.AGENT_CODEX)
+        content = gi.read_text()
+        lines = [line.strip() for line in content.splitlines()]
+        assert ".agents/" not in lines
+        assert "*.tmp" in content
+        for entry in SELECTIVE_ENTRIES[1:]:
+            assert entry in content
+
     def test_migration_removes_blanket_godotmaker(self, tmp_path):
         """Old .godotmaker/ blanket line is replaced by selective entries on upgrade."""
         gi = tmp_path / ".gitignore"
@@ -387,6 +557,28 @@ class TestEnsureGitignore:
         # Selective entries must now be present
         for entry in SELECTIVE_ENTRIES:
             assert entry in content
+
+
+class TestEnsureGitattributes:
+    def test_creates_shell_lf_rule(self, tmp_path):
+        ensure_gitattributes(tmp_path)
+        content = (tmp_path / ".gitattributes").read_text()
+        assert "*.sh text eol=lf" in content
+
+    def test_appends_shell_lf_rule(self, tmp_path):
+        attrs = tmp_path / ".gitattributes"
+        attrs.write_text("*.gd text\n", encoding="utf-8")
+        ensure_gitattributes(tmp_path)
+        content = attrs.read_text(encoding="utf-8")
+        assert "*.gd text" in content
+        assert "*.sh text eol=lf" in content
+
+    def test_keeps_existing_shell_lf_rule_once(self, tmp_path):
+        attrs = tmp_path / ".gitattributes"
+        attrs.write_text("*.sh text eol=lf\n", encoding="utf-8")
+        ensure_gitattributes(tmp_path)
+        content = attrs.read_text(encoding="utf-8")
+        assert content.count("*.sh text eol=lf") == 1
 
 
 WORKTREEINCLUDE_ENTRIES = [".claude/", "!.claude/worktrees/"]
@@ -481,6 +673,23 @@ class TestPublishSkills:
         assert (target / "physics" / "SKILL.md").exists()
         assert (target / "ui" / "SKILL.md").exists()
 
+    def test_codex_project_skills_keep_shared_surface_text(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        skill = repo / "skills" / "core" / "gm-scaffold" / "SKILL.md"
+        skill.write_text(
+            "Read .claude/godotmaker.yaml and ${CLAUDE_SKILL_DIR}/tools/x.sh\n",
+            encoding="utf-8",
+        )
+        target = tmp_path / "target" / ".agents" / "skills"
+        target.mkdir(parents=True)
+        count = publish_skills(repo, target, publish.AGENT_CODEX)
+        assert count == 4
+        content = (target / "gm-scaffold" / "SKILL.md").read_text(encoding="utf-8")
+        assert ".claude/godotmaker.yaml" in content
+        assert "${CLAUDE_SKILL_DIR}/tools/x.sh" in content
+        assert (target / "gecs" / "SKILL.md").exists()
+        assert (target / "_read_config.sh").exists()
+
     def test_cleans_pycache(self, tmp_path):
         repo = self._make_repo(tmp_path)
         target = tmp_path / "target"
@@ -506,6 +715,68 @@ class TestPublishSkills:
         # Second publish
         publish_skills(repo, target)
         assert (target / "gecs" / "SKILL.md").read_text() == "# updated\n"
+
+
+class TestDeployAgentInstructions:
+    def _make_repo(self, tmp_path):
+        repo = tmp_path / "repo"
+        templates = repo / "templates"
+        templates.mkdir(parents=True)
+        (templates / "game-claude.md").write_text(
+            "# CLAUDE.md\n\n"
+            "The `/gm-*` skills drive the build pipeline.\n\n"
+            "| Each role's full contract | `.claude/skills/gm-*/SKILL.md` |\n",
+            encoding="utf-8",
+        )
+        codex_templates = repo / "agent-runtimes" / "codex" / "templates"
+        codex_templates.mkdir(parents=True)
+        (codex_templates / "agents-bootstrap.md").write_text(
+            "Before executing any `$gm-*` skill, apply the GodotMaker Codex "
+            "runtime mapping at `.agents/references/runtime-mapping.md`.\n\n",
+            encoding="utf-8",
+        )
+        return repo
+
+    def test_claude_deploys_claude_md(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        target = tmp_path / "target"
+        target.mkdir()
+        deploy_agent_instructions(repo, target, publish.AGENT_CLAUDE_CODE)
+        assert (target / "CLAUDE.md").exists()
+        assert not (target / "AGENTS.md").exists()
+
+    def test_codex_derives_agents_md_from_claude_template(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        target = tmp_path / "target"
+        target.mkdir()
+        deploy_agent_instructions(repo, target, publish.AGENT_CODEX)
+        content = (target / "AGENTS.md").read_text(encoding="utf-8")
+        assert content.startswith("# AGENTS.md")
+        assert "$gm-*" in content
+        assert ".agents/references/runtime-mapping.md" in content
+        assert ".claude/skills/gm-*/SKILL.md" in content
+        assert not (target / "CLAUDE.md").exists()
+
+    def test_render_codex_instructions_keeps_shared_surface_paths(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        content = render_agent_instructions(repo, publish.AGENT_CODEX)
+        assert content is not None
+        assert "CLAUDE.md" not in content
+        assert "AGENTS.md" in content
+        assert ".claude/skills/gm-*/SKILL.md" in content
+        assert ".agents/references/runtime-mapping.md" in content
+        assert "$gm-" in content
+        assert "`/gm-*`" in content
+
+    def test_claude_instructions_do_not_include_codex_bootstrap(self):
+        content = render_agent_instructions(
+            Path(__file__).resolve().parents[2],
+            publish.AGENT_CLAUDE_CODE,
+        )
+        assert content is not None
+        assert "If this file is rendered as `AGENTS.md`" not in content
+        assert "runtime-mapping.md" not in content
+        assert "Codex runtime mapping" not in content
 
 
 class TestRmtreeForce:
@@ -546,6 +817,254 @@ class TestRmtreeForce:
         assert not target.exists()
 
 
+class TestCodexPublishParity:
+    def test_codex_publish_outputs_required_runtime_contract(self, tmp_path, monkeypatch):
+        target, _calls = _publish_codex_project(tmp_path, monkeypatch)
+
+        for skill_name in PRIMARY_ROLE_SKILLS:
+            assert (
+                target / ".agents" / "skills" / skill_name / "SKILL.md"
+            ).exists(), f"missing Codex skill: {skill_name}"
+
+        assert (target / ".agents" / "skills" / "gm-build" / "SKILL.md").exists()
+        assert (target / "AGENTS.md").exists()
+        assert not (target / "CLAUDE.md").exists()
+
+        agents_root = target / ".agents"
+        codex_mapping_refs = [
+            path for path, _text in _runtime_text_files(agents_root)
+            if path.name == "runtime-mapping.md"
+        ]
+        agents_md = (target / "AGENTS.md").read_text(encoding="utf-8")
+
+        assert codex_mapping_refs or "runtime-mapping.md" in agents_md, (
+            "Codex publish must include a Codex runtime mapping reference or "
+            "index it from AGENTS.md"
+        )
+
+    def test_published_codex_mapping_preserves_surface_to_execution_mapping(
+        self, tmp_path, monkeypatch
+    ):
+        target, _calls = _publish_codex_project(tmp_path, monkeypatch)
+        mapping = (
+            target / ".agents" / "references" / "runtime-mapping.md"
+        ).read_text(encoding="utf-8")
+
+        assert "`/gm-*`" in mapping
+        assert "`$gm-*`" in mapping
+        assert "`/gm-build` means execute `$gm-build`" in mapping
+        assert "| `.claude/skills` | `.agents/skills` |" in mapping
+        assert "| `.claude/agents` | `.agents/agents` |" in mapping
+        assert "| `.claude/templates` | `.agents/templates` |" in mapping
+        assert "Codex publish must register `godot-mcp` by default" in mapping
+        assert "explicit user\n  opt-in" not in mapping
+
+    def test_published_codex_mapping_uses_single_canonical_reference(
+        self, tmp_path, monkeypatch
+    ):
+        target, _calls = _publish_codex_project(tmp_path, monkeypatch)
+
+        assert (
+            target / ".agents" / "references" / "runtime-mapping.md"
+        ).exists()
+        assert (
+            target / ".agents" / "references" / "delegation-worktree.md"
+        ).exists()
+
+        for skill_name in PRIMARY_ROLE_SKILLS:
+            assert not (
+                target / ".agents" / "skills" / skill_name / "references" /
+                "runtime-mapping.md"
+            ).exists(), f"unexpected skill-local Codex mapping for {skill_name}"
+
+    def test_codex_runtime_tree_keeps_surface_refs_with_mapping(
+        self, tmp_path, monkeypatch
+    ):
+        target, _calls = _publish_codex_project(tmp_path, monkeypatch)
+        agents_root = target / ".agents"
+
+        runtime_texts = list(_runtime_text_files(agents_root))
+        mapping = "\n".join(
+            text for path, text in runtime_texts if path.name == "runtime-mapping.md"
+        )
+        surface_refs = [
+            f"{path.relative_to(target)}"
+            for path, text in runtime_texts
+            if ".claude/skills" in text
+        ]
+
+        assert surface_refs, (
+            "Codex publish may keep shared GodotMaker/Claude-first surface "
+            "references instead of rewriting every skill inline"
+        )
+        assert "| `.claude/skills` | `.agents/skills` |" in mapping
+        assert "| `.claude/agents` | `.agents/agents` |" in mapping
+        assert "| `.claude/templates` | `.agents/templates` |" in mapping
+        assert "`/gm-*`" in mapping and "`$gm-*`" in mapping
+
+    def test_codex_literal_slash_gm_execution_requires_mapping(
+        self, tmp_path, monkeypatch
+    ):
+        target, _calls = _publish_codex_project(tmp_path, monkeypatch)
+        agents_root = target / ".agents"
+        runtime_texts = list(_runtime_text_files(agents_root))
+        agents_md = (target / "AGENTS.md").read_text(encoding="utf-8")
+        mapping_text = "\n".join(
+            [agents_md]
+            + [text for path, text in runtime_texts if path.name == "runtime-mapping.md"]
+        )
+        has_codex_mapping = (
+            "/gm-*" in mapping_text
+            and "$gm-*" in mapping_text
+            and "codex" in mapping_text.lower()
+        )
+
+        literal_slash_commands = []
+        for path, text in runtime_texts:
+            for match in LITERAL_SLASH_GM_EXECUTION.finditer(text):
+                literal_slash_commands.append(
+                    f"{path.relative_to(target)}: {match.group(0)}"
+                )
+
+        assert has_codex_mapping or not literal_slash_commands, (
+            "Codex output must not tell Codex to literally execute /gm-* "
+            "without a discoverable /gm-* to $gm-* runtime mapping:\n"
+            + "\n".join(literal_slash_commands)
+        )
+
+    def test_codex_agents_md_indexes_runtime_mapping(self, tmp_path, monkeypatch):
+        target, _calls = _publish_codex_project(tmp_path, monkeypatch)
+        content = (target / "AGENTS.md").read_text(encoding="utf-8")
+        lower = content.lower()
+
+        assert "runtime-mapping.md" in content
+        assert "$gm-*" in content
+        assert "codex" in lower
+        assert "mapping" in lower or "runtime" in lower
+
+
+class TestPublishMainAgentBranches:
+    def test_codex_publish_registers_mcp_by_default(
+        self, tmp_path, monkeypatch
+    ):
+        from _version import SemVer
+
+        target = tmp_path / "target"
+        target.mkdir()
+        calls: list[str] = []
+
+        def _record(name):
+            def _inner(*_args, **_kwargs):
+                calls.append(name)
+                if name in ("create_godotmaker_yaml", "register_codex_mcp"):
+                    return True
+                return None
+            return _inner
+
+        monkeypatch.setattr(publish, "check_version_upgrade",
+                            lambda *_args, **_kwargs: (True, "FRESH", None, SemVer(0, 3, 5)))
+        for name in (
+            "publish_skills", "publish_shared_refs", "publish_directory",
+            "deploy_settings", "deploy_agent_instructions", "create_godotmaker_yaml",
+            "create_project_config", "deploy_stage_schemas", "create_project_dirs",
+            "register_mcp", "register_codex_mcp", "register_godot_permissions", "ensure_gitignore",
+            "ensure_gitattributes",
+            "ensure_worktreeinclude", "ensure_git_repo", "write_target_version",
+            "baseline_applied",
+        ):
+            monkeypatch.setattr(publish, name, _record(name))
+        monkeypatch.setattr(publish, "read_godot_path", lambda *_args, **_kwargs: "godot")
+        monkeypatch.setattr(sys, "argv",
+                            ["publish.py", "--agent", "codex", "--force", str(target)])
+
+        publish.main()
+
+        assert "deploy_agent_instructions" in calls
+        assert "deploy_settings" not in calls
+        assert "register_codex_mcp" in calls
+        assert "register_mcp" not in calls
+        assert "register_godot_permissions" not in calls
+        assert "ensure_worktreeinclude" not in calls
+
+    def test_codex_publish_missing_yaml_does_not_register_mcp_with_fallback_godot(
+        self, tmp_path, monkeypatch
+    ):
+        from _version import SemVer
+
+        target = tmp_path / "target"
+        target.mkdir()
+        codex_mcp_calls: list[str] = []
+
+        def _no_op(*_args, **_kwargs):
+            return None
+
+        monkeypatch.setattr(
+            publish,
+            "check_version_upgrade",
+            lambda *_args, **_kwargs: (True, "FRESH", None, SemVer(0, 3, 5)),
+        )
+        for name in (
+            "publish_skills", "publish_shared_refs", "publish_directory",
+            "deploy_settings", "deploy_agent_instructions",
+            "create_project_config", "deploy_stage_schemas", "create_project_dirs",
+            "register_mcp", "register_godot_permissions", "ensure_gitignore",
+            "ensure_gitattributes",
+            "ensure_worktreeinclude", "ensure_git_repo", "write_target_version",
+            "baseline_applied",
+        ):
+            monkeypatch.setattr(publish, name, _no_op)
+        monkeypatch.setattr(publish, "create_godotmaker_yaml",
+                            lambda *_args, **_kwargs: False)
+        monkeypatch.setattr(
+            publish,
+            "register_codex_mcp",
+            lambda _target, godot_path: codex_mcp_calls.append(godot_path),
+        )
+        monkeypatch.setattr(sys, "argv",
+                            ["publish.py", "--agent", "codex", "--force", str(target)])
+
+        with pytest.raises(SystemExit):
+            publish.main()
+
+        assert codex_mcp_calls == []
+
+    def test_claude_publish_runs_claude_specific_integrations(self, tmp_path, monkeypatch):
+        from _version import SemVer
+
+        target = tmp_path / "target"
+        target.mkdir()
+        calls: list[str] = []
+
+        def _record(name):
+            def _inner(*_args, **_kwargs):
+                calls.append(name)
+                return None
+            return _inner
+
+        monkeypatch.setattr(publish, "check_version_upgrade",
+                            lambda *_args, **_kwargs: (True, "FRESH", None, SemVer(0, 3, 5)))
+        for name in (
+            "publish_skills", "publish_shared_refs", "publish_directory",
+            "deploy_settings", "deploy_agent_instructions", "create_godotmaker_yaml",
+            "create_project_config", "deploy_stage_schemas", "create_project_dirs",
+            "register_mcp", "register_codex_mcp", "register_godot_permissions", "ensure_gitignore",
+            "ensure_gitattributes",
+            "ensure_worktreeinclude", "ensure_git_repo", "write_target_version",
+            "baseline_applied",
+        ):
+            monkeypatch.setattr(publish, name, _record(name))
+        monkeypatch.setattr(publish, "read_godot_path", lambda *_args, **_kwargs: "godot")
+        monkeypatch.setattr(sys, "argv", ["publish.py", "--force", str(target)])
+
+        publish.main()
+
+        assert "deploy_settings" in calls
+        assert "register_mcp" in calls
+        assert "register_codex_mcp" not in calls
+        assert "register_godot_permissions" in calls
+        assert "ensure_worktreeinclude" in calls
+
+
 class TestPublishMainForceRmtree:
     """End-to-end: publish.main --force must survive a target whose
     .claude/skills contains read-only files (e.g. git pack-*.idx from a
@@ -578,10 +1097,10 @@ class TestPublishMainForceRmtree:
 
         for name in (
             "publish_skills", "publish_shared_refs", "publish_directory",
-            "deploy_settings", "deploy_claude_md", "create_godotmaker_yaml",
+            "deploy_settings", "deploy_agent_instructions", "create_godotmaker_yaml",
             "create_project_config", "deploy_stage_schemas",
-            "create_project_dirs", "register_mcp", "register_godot_permissions",
-            "ensure_gitignore",
+            "create_project_dirs", "register_mcp", "register_codex_mcp", "register_godot_permissions",
+            "ensure_gitignore", "ensure_gitattributes",
             "ensure_worktreeinclude", "ensure_git_repo", "write_target_version",
         ):
             monkeypatch.setattr(publish, name, _no_op)

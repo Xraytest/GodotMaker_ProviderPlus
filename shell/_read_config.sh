@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Read a value from .claude/godotmaker.yaml
+# Read a value from the selected agent's godotmaker.yaml.
 # Usage: bash _read_config.sh <key>
-#   e.g. GODOT=$(bash "${CLAUDE_SKILL_DIR}/../_read_config.sh" godot_path)
+#   e.g. GODOT=$(bash ".agents/skills/_read_config.sh" godot_path)
 #
 # Falls back to default if godotmaker.yaml doesn't exist or key is missing.
 # Defaults: godot_path → "godot"
@@ -13,7 +13,10 @@ if [ -z "$KEY" ]; then
     exit 1
 fi
 
-# Locate godotmaker.yaml relative to this script (published at .claude/skills/_read_config.sh)
+# Locate godotmaker.yaml relative to this script.
+# The helper is published at .claude/skills/_read_config.sh or
+# .agents/skills/_read_config.sh, so ../godotmaker.yaml resolves to the
+# selected agent's project-local config.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../godotmaker.yaml"
 

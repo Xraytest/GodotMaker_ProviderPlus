@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Check that the GodotMaker development environment is correctly set up.
 
-Verifies: Git, Python, Node.js, Godot, Claude Code, API keys, pip packages.
+Verifies: Git, Python, Node.js, Godot, selected coding agent, API keys, pip
+packages.
 
 Usage:
     python tools/check_env.py
@@ -11,6 +12,9 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+
+from agent_runtime import AGENT_CLAUDE_CODE, AGENT_CODEX, detect_agent, read_godot_path
 
 
 class EnvCheck:
@@ -124,15 +128,40 @@ def check_node(r: EnvCheck):
         r.fail("npx not found (should come with Node.js)")
 
 
-def check_godot(r: EnvCheck):
+def _get_version_from_path(path: str, pattern: str = r"(\d+(?:\.\d+)+)") -> str | None:
+    try:
+        result = subprocess.run(
+            [path, "--version"],
+            capture_output=True, text=True, timeout=10,
+        )
+        output = result.stdout + result.stderr
+        match = re.search(pattern, output)
+        return match.group(1) if match else None
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+
+
+def check_godot(r: EnvCheck, project_dir: Path):
     print("\n--- Godot ---")
+    configured = read_godot_path(project_dir)
+    if configured:
+        version = _get_version_from_path(configured)
+        if version and parse_version(version)[:2] >= (4, 4):
+            r.ok(f"Godot {version}, configured path: {configured}")
+            return
+        if version:
+            r.fail(f"Configured Godot {version} too old at {configured}")
+            return
+        r.fail(f"Configured Godot path does not run: {configured}")
+        return
+
     for cmd in ("godot", "godot4"):
         version = get_version(cmd)
-        if version and parse_version(version)[:2] >= (4, 5):
-            r.ok(f"Godot {version} (>= 4.5), command: {cmd}")
+        if version and parse_version(version)[:2] >= (4, 4):
+            r.ok(f"Godot {version}, command: {cmd}")
             return
         elif version:
-            r.fail(f"Godot {version} too old (>= 4.5 required)")
+            r.fail(f"Godot {version} too old (>= 4.4 required)")
             return
 
     r.warn(
@@ -152,6 +181,60 @@ def check_claude(r: EnvCheck):
         r.ok(f"Claude Code found: {cmd}")
     else:
         r.fail("Claude Code not found. Install: npm install -g @anthropic-ai/claude-code")
+
+
+def check_codex(r: EnvCheck, project_dir: Path):
+    print("\n--- Codex ---")
+    cmd = (
+        shutil.which("codex")
+        or shutil.which("codex.cmd")
+        or shutil.which("codex.exe")
+    )
+    if not cmd:
+        r.fail("Codex CLI not found. Install Codex before using agent: codex.")
+        return
+    version = get_version(cmd, pattern=r"(\d+(?:\.\d+)+)")
+    r.ok(f"Codex CLI found: {cmd}" + (f" ({version})" if version else ""))
+
+    mapping = project_dir / ".agents" / "references" / "runtime-mapping.md"
+    skills = project_dir / ".agents" / "skills"
+    config = project_dir / ".agents" / "godotmaker.yaml"
+    for path, label in [
+        (skills, ".agents/skills"),
+        (mapping, ".agents/references/runtime-mapping.md"),
+        (config, ".agents/godotmaker.yaml"),
+    ]:
+        if path.exists():
+            r.ok(f"{label} present")
+        else:
+            r.fail(f"{label} missing; re-run publish with --agent codex")
+
+    try:
+        result = subprocess.run(
+            [cmd, "mcp", "list"],
+            cwd=str(project_dir),
+            capture_output=True, text=True, timeout=15,
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        if result.returncode == 0 and "godot" in output:
+            r.ok("Codex MCP server 'godot' configured")
+        elif result.returncode == 0:
+            r.fail("Codex MCP server 'godot' missing; re-run publish")
+        else:
+            r.fail("Could not list Codex MCP servers")
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        r.fail("Could not list Codex MCP servers")
+
+
+def check_selected_agent(r: EnvCheck, project_dir: Path):
+    agent = detect_agent(project_dir)
+    print(f"\n--- Selected Agent ({agent}) ---")
+    if agent == AGENT_CODEX:
+        check_codex(r, project_dir)
+    elif agent == AGENT_CLAUDE_CODE:
+        check_claude(r)
+    else:
+        r.fail(f"Unsupported GodotMaker agent: {agent}")
 
 
 def check_api_keys(r: EnvCheck):
@@ -193,12 +276,13 @@ def main():
     print("=" * 40)
 
     r = EnvCheck()
+    project_dir = Path(__file__).resolve().parent.parent
 
     check_git(r)
     check_python(r)
     check_node(r)
-    check_godot(r)
-    check_claude(r)
+    check_godot(r, project_dir)
+    check_selected_agent(r, project_dir)
     check_api_keys(r)
 
     # Summary

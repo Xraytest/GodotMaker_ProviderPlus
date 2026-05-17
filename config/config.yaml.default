@@ -2,6 +2,10 @@
 # Edit these values to customize behavior
 # Deployed to .godotmaker/config.yaml by publish script
 
+# Selected coding-agent runtime for this project.
+# publish.py updates this value on each publish.
+agent: claude-code
+
 # VQA model for visual quality checks (any Gemini model name)
 # Default: gemini-2.5-flash
 # Examples: gemini-2.5-flash, gemini-2.0-flash, gemini-flash-latest

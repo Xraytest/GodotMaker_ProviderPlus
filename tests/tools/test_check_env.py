@@ -2,6 +2,7 @@
 import os
 import sys
 import subprocess
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(
@@ -171,6 +172,51 @@ class TestCheckFunctions:
         r = EnvCheck()
         check_claude(r)
         assert any("not found" in f.lower() for f in r.failed)
+
+    @patch("check_env._get_version_from_path", return_value="4.5.1")
+    @patch("check_env.read_godot_path", return_value="/opt/godot")
+    def test_check_godot_uses_configured_agent_path(self, mock_path, mock_ver, tmp_path):
+        from check_env import check_godot
+        r = EnvCheck()
+        check_godot(r, tmp_path)
+        assert any("configured path: /opt/godot" in p for p in r.passed)
+        assert len(r.failed) == 0
+
+    @patch("check_env.check_codex")
+    @patch("check_env.detect_agent", return_value="codex")
+    def test_check_selected_agent_uses_codex(self, mock_detect, mock_codex, tmp_path):
+        from check_env import check_selected_agent
+        r = EnvCheck()
+        check_selected_agent(r, tmp_path)
+        mock_codex.assert_called_once_with(r, tmp_path)
+
+    @patch("check_env.check_claude")
+    @patch("check_env.detect_agent", return_value="claude-code")
+    def test_check_selected_agent_uses_claude(self, mock_detect, mock_claude, tmp_path):
+        from check_env import check_selected_agent
+        r = EnvCheck()
+        check_selected_agent(r, tmp_path)
+        mock_claude.assert_called_once_with(r)
+
+    @patch("check_env.get_version", return_value="0.99.0")
+    @patch("check_env.shutil.which", return_value="/usr/bin/codex")
+    @patch("check_env.subprocess.run")
+    def test_check_codex_validates_runtime_files_and_mcp(
+        self, mock_run, mock_which, mock_ver, tmp_path: Path
+    ):
+        from check_env import check_codex
+        (tmp_path / ".agents" / "skills").mkdir(parents=True)
+        (tmp_path / ".agents" / "references").mkdir()
+        (tmp_path / ".agents" / "references" / "runtime-mapping.md").write_text("")
+        (tmp_path / ".agents" / "godotmaker.yaml").write_text("godot_path: /opt/godot\n")
+        mock_run.return_value = MagicMock(returncode=0, stdout="godot\n", stderr="")
+
+        r = EnvCheck()
+        check_codex(r, tmp_path)
+
+        assert any("Codex CLI found" in p for p in r.passed)
+        assert any("Codex MCP server 'godot' configured" in p for p in r.passed)
+        assert len(r.failed) == 0
 
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaSyTestKey12345678"}, clear=False)
     def test_check_api_keys_present(self):

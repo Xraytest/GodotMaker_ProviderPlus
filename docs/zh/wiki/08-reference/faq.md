@@ -127,7 +127,7 @@ git checkout v0.1.0          # 在 GodotMaker 仓库中执行
 python tools/publish.py --force /path/to/my-game
 ```
 
-`--force` 同时做几件事：跳过 MINOR/MAJOR 升级提示、允许降级、覆盖 `.claude/settings.json`。完整的干净重新初始化（清空 `.claude/skills/`、`.godotmaker/hooks/`、运行时状态文件等）**只在 MAJOR 升级时**触发——PATCH/MINOR/SAME 升级时只是原地覆盖现有框架文件。所以在上面的降级例子里，`--force` 的主要作用是绕过降级阻拦。
+`--force` 同时做几件事：跳过 MINOR/MAJOR 升级提示、允许降级；对 Claude Code 目标还会覆盖 `.claude/settings.json`。完整的干净重新初始化（清空所选 agent 的 skills、`.godotmaker/hooks/`、运行时状态文件等）**只在 MAJOR 升级时**触发——PATCH/MINOR/SAME 升级时只是原地覆盖现有框架文件。所以在上面的降级例子里，`--force` 的主要作用是绕过降级阻拦。
 
 ### 流水线里提到"stage"，但我只看到 `/gm-*` 指令。这是怎么回事？
 

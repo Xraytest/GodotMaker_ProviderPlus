@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Publish GodotMaker skills into a target Godot project directory.
 
-Flattens skills/core/* and skills/reviewer/* into .claude/skills/,
-copies tools, config, hooks, templates, and sets up godot-mcp.
+Flattens skills/core/* and skills/reviewer/* into the selected agent-native
+skill location: .claude/skills/ for Claude Code or .agents/skills/ for Codex.
+Also copies tools, config, hooks, templates, and sets up agent-specific files.
 
 Supports versioned upgrades: compares source VERSION against the
 target's .godotmaker/version and prompts accordingly.
 
 Usage:
     python tools/publish.py <target_godot_project_dir>
+    python tools/publish.py --agent codex <target_godot_project_dir>
     python tools/publish.py --force <target_godot_project_dir>
 """
 import argparse
@@ -19,8 +21,11 @@ import shutil
 import stat
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
+
+from agent_runtime import AGENT_CLAUDE_CODE, AGENT_CODEX
 
 from _version import SemVer, parse_version
 from migrate import (
@@ -37,8 +42,99 @@ class VersionCheckResult(NamedTuple):
     source_ver: SemVer | None
 
 EXCLUDE_DIRS = {"__pycache__", "doc_source", ".workspace"}
+AGENT_CHOICES = (AGENT_CLAUDE_CODE, AGENT_CODEX)
+AGENT_RUNTIME_SOURCE_ROOTS = {
+    AGENT_CODEX: Path("agent-runtimes") / "codex",
+}
+AGENT_RUNTIME_REFERENCES = {
+    AGENT_CODEX: (
+        Path("references") / "runtime-mapping.md",
+        Path("references") / "delegation-worktree.md",
+    ),
+}
+AGENT_ROOT_BOOTSTRAP_TEMPLATES = {
+    AGENT_CODEX: Path("templates") / "agents-bootstrap.md",
+}
 
 DEFAULT_CONFIG_TEMPLATE = Path(__file__).resolve().parent.parent / "config" / "config.yaml.default"
+
+
+@dataclass(frozen=True)
+class AgentPublishAdapter:
+    """Selected-agent publish contract for project-local GodotMaker output."""
+
+    agent_id: str
+    project_config_root: str
+    skill_root: str
+    agents_root: str
+    config_root: str
+    templates_root: str
+    runtime_references_root: str | None
+    root_instruction_filename: str
+    deploy_settings: bool
+    register_claude_mcp: bool
+    register_godot_permissions: bool
+    ensure_worktreeinclude: bool
+
+    def project_config_dir(self, target: Path) -> Path:
+        return target / self.project_config_root
+
+    def skill_dir(self, target: Path) -> Path:
+        return target / self.skill_root
+
+    def agents_dir(self, target: Path) -> Path:
+        return target / self.agents_root
+
+    def config_dir(self, target: Path) -> Path:
+        return target / self.config_root
+
+    def templates_dir(self, target: Path) -> Path:
+        return target / self.templates_root
+
+    def runtime_references_dir(self, target: Path) -> Path | None:
+        if self.runtime_references_root is None:
+            return None
+        return target / self.runtime_references_root
+
+
+AGENT_ADAPTERS = {
+    AGENT_CLAUDE_CODE: AgentPublishAdapter(
+        agent_id=AGENT_CLAUDE_CODE,
+        project_config_root=".claude",
+        skill_root=".claude/skills",
+        agents_root=".claude/agents",
+        config_root=".claude/config",
+        templates_root=".claude/templates",
+        runtime_references_root=None,
+        root_instruction_filename="CLAUDE.md",
+        deploy_settings=True,
+        register_claude_mcp=True,
+        register_godot_permissions=True,
+        ensure_worktreeinclude=True,
+    ),
+    AGENT_CODEX: AgentPublishAdapter(
+        agent_id=AGENT_CODEX,
+        project_config_root=".agents",
+        skill_root=".agents/skills",
+        agents_root=".agents/agents",
+        config_root=".agents/config",
+        templates_root=".agents/templates",
+        runtime_references_root=".agents/references",
+        root_instruction_filename="AGENTS.md",
+        deploy_settings=False,
+        register_claude_mcp=False,
+        register_godot_permissions=False,
+        ensure_worktreeinclude=False,
+    ),
+}
+
+
+def get_agent_adapter(agent: str) -> AgentPublishAdapter:
+    """Return the publish adapter for a supported coding agent."""
+    try:
+        return AGENT_ADAPTERS[agent]
+    except KeyError as e:
+        raise ValueError(f"Unsupported coding agent: {agent}") from e
 
 
 def read_source_version(repo_root: Path) -> SemVer | None:
@@ -218,13 +314,43 @@ def copy_tree(src: Path, dst: Path):
 # ── Publish steps ──────────────────────────────────────────────
 
 
-def publish_skills(repo_root: Path, skills_target: Path) -> int:
+def render_root_instruction_text(text: str, adapter: AgentPublishAdapter) -> str:
+    """Render the selected agent's root instruction file."""
+    if adapter.agent_id == AGENT_CLAUDE_CODE:
+        return text
+
+    return text.replace("CLAUDE.md", adapter.root_instruction_filename)
+
+
+def render_agent_template_tree(root: Path, adapter: AgentPublishAdapter) -> None:
+    """Rename generated project instruction templates for the selected agent.
+
+    This is intentionally narrow. Shared skills and references keep their
+    GodotMaker/Claude-first surface vocabulary; Codex interprets it through the
+    published runtime mapping instead of receiving inline rewritten docs.
+    """
+    if adapter.agent_id == AGENT_CLAUDE_CODE:
+        return
+
+    for file in root.rglob("*"):
+        if not file.is_file() or file.name != "claude.md.tmpl":
+            continue
+        text = file.read_text(encoding="utf-8")
+        rewritten = text.replace("CLAUDE.md", adapter.root_instruction_filename)
+        if rewritten != text:
+            file.write_text(rewritten, encoding="utf-8")
+        file.replace(file.with_name("agents.md.tmpl"))
+
+
+def publish_skills(repo_root: Path, skills_target: Path,
+                   agent: str = AGENT_CLAUDE_CODE) -> int:
     """Flatten-copy skills/core/* and skills/reviewer/* to target.
 
     Directory names starting with `_` (e.g. _shared/) are excluded — they hold
     cross-skill source material rather than self-contained skills, and are
     distributed by publish_shared_refs() instead.
     """
+    adapter = get_agent_adapter(agent)
     count = 0
     for layer in ("core", "reviewer"):
         layer_dir = repo_root / "skills" / layer
@@ -237,12 +363,14 @@ def publish_skills(repo_root: Path, skills_target: Path) -> int:
                 continue
             dst = skills_target / skill_dir.name
             copy_tree(skill_dir, dst)
+            render_agent_template_tree(dst, adapter)
             count += 1
 
     # Copy _read_config.sh helper
     helper = repo_root / "shell" / "_read_config.sh"
     if helper.exists():
-        shutil.copy2(helper, skills_target / "_read_config.sh")
+        helper_target = skills_target / "_read_config.sh"
+        shutil.copy2(helper, helper_target)
 
     print(f"Published skills: {count}")
     return count
@@ -254,8 +382,43 @@ SHARED_HEADER_TEMPLATE = (
     "Edit the source under skills/core/_shared/ instead. -->\n\n"
 )
 
+RUNTIME_REFERENCE_HEADER_TEMPLATE = (
+    "<!-- AUTO-GENERATED from {source_path}. "
+    "Do NOT edit this deployed copy - it is overwritten on every publish. "
+    "Edit the source runtime reference instead. -->\n\n"
+)
 
-def publish_shared_refs(repo_root: Path, skills_target: Path) -> int:
+
+def _shared_manifest_targets(entry: object, filename: str) -> list[str]:
+    """Return target skills from a legacy or agent-aware shared ref entry."""
+    if isinstance(entry, list):
+        return entry
+    if isinstance(entry, dict):
+        targets = entry.get("skills", entry.get("targets"))
+        if isinstance(targets, list):
+            return targets
+    raise ValueError(
+        f"_shared/manifest.json entry for {filename} must be a list of skill "
+        "names or an object with a 'skills' list."
+    )
+
+
+def _shared_manifest_applies_to_agent(entry: object, agent: str) -> bool:
+    """Return whether a shared ref entry should publish for the selected agent."""
+    if not isinstance(entry, dict):
+        return True
+    agents = entry.get("agents")
+    if agents is None:
+        return True
+    if not isinstance(agents, list):
+        raise ValueError(
+            "_shared/manifest.json 'agents' must be a list when present."
+        )
+    return agent in agents
+
+
+def publish_shared_refs(repo_root: Path, skills_target: Path,
+                        agent: str = AGENT_CLAUDE_CODE) -> int:
     """Distribute shared reference docs into each consumer skill's references/.
 
     The single source of truth is `skills/core/_shared/`. `_shared/manifest.json`
@@ -265,6 +428,7 @@ def publish_shared_refs(repo_root: Path, skills_target: Path) -> int:
     no `.claude/skills/_shared/` directory exists at runtime, and editors
     opening a deployed copy see an explicit warning at the top.
     """
+    adapter = get_agent_adapter(agent)
     shared_dir = repo_root / "skills" / "core" / "_shared"
     manifest_path = shared_dir / "manifest.json"
     if not manifest_path.exists():
@@ -279,7 +443,10 @@ def publish_shared_refs(repo_root: Path, skills_target: Path) -> int:
         ) from e
     files = manifest.get("files", {})
     distributions = 0
-    for filename, target_skills in files.items():
+    for filename, entry in files.items():
+        if not _shared_manifest_applies_to_agent(entry, agent):
+            continue
+        target_skills = _shared_manifest_targets(entry, filename)
         src = shared_dir / filename
         if not src.exists():
             raise FileNotFoundError(
@@ -300,8 +467,7 @@ def publish_shared_refs(repo_root: Path, skills_target: Path) -> int:
                 )
             references = skill_root / "references"
             references.mkdir(parents=True, exist_ok=True)
-            (references / filename).write_text(deployed_content,
-                                               encoding="utf-8")
+            (references / filename).write_text(deployed_content, encoding="utf-8")
             distributions += 1
 
     print(f"Distributed shared refs: {distributions} copies "
@@ -309,7 +475,48 @@ def publish_shared_refs(repo_root: Path, skills_target: Path) -> int:
     return distributions
 
 
-def publish_directory(src: Path, dst: Path, label: str, count_pattern: str = "*.py"):
+def publish_runtime_references(repo_root: Path, target: Path,
+                               agent: str = AGENT_CLAUDE_CODE) -> int:
+    """Publish agent-wide runtime references outside individual skills."""
+    source_root = AGENT_RUNTIME_SOURCE_ROOTS.get(agent)
+    reference_paths = AGENT_RUNTIME_REFERENCES.get(agent, ())
+    if source_root is None or not reference_paths:
+        return 0
+
+    adapter = get_agent_adapter(agent)
+    references_dir = adapter.runtime_references_dir(target)
+    if references_dir is None:
+        return 0
+
+    source_dir = repo_root / source_root
+    references_dir.mkdir(parents=True, exist_ok=True)
+
+    count = 0
+    for relative_path in reference_paths:
+        src = source_dir / relative_path
+        if not src.exists():
+            raise FileNotFoundError(
+                f"Agent runtime reference {relative_path} does not exist at {src}."
+            )
+        content = (
+            RUNTIME_REFERENCE_HEADER_TEMPLATE.format(
+                source_path=(source_root / relative_path).as_posix()
+            )
+            + src.read_text(encoding="utf-8")
+        )
+        (references_dir / relative_path.name).write_text(content, encoding="utf-8")
+        count += 1
+
+    print(f"Published {agent} runtime refs: {count}")
+    return count
+
+
+def publish_directory(
+    src: Path,
+    dst: Path,
+    label: str,
+    count_pattern: str = "*.py",
+):
     """Copy a directory from repo to target, printing file count."""
     if not src.exists():
         return
@@ -331,15 +538,57 @@ def deploy_settings(repo_root: Path, config_dir: Path, force: bool):
         print("settings.json already exists, skipping (use --force to overwrite)")
 
 
-def deploy_claude_md(repo_root: Path, target: Path):
-    """Deploy CLAUDE.md from template if not exists."""
-    dst = target / "CLAUDE.md"
+def deploy_agent_instructions(repo_root: Path, target: Path, agent: str):
+    """Deploy root agent instructions for the selected coding agent."""
+    adapter = get_agent_adapter(agent)
+    filename = adapter.root_instruction_filename
+    dst = target / filename
     if dst.exists():
         return
+
+    content = render_agent_instructions(repo_root, agent)
+    if content is None:
+        return
+    dst.write_text(content, encoding="utf-8")
+    print(f"Created {filename}")
+
+
+def render_agent_instructions(repo_root: Path, agent: str) -> str | None:
+    """Render root agent instructions from one source template."""
+    adapter = get_agent_adapter(agent)
     template = repo_root / "templates" / "game-claude.md"
-    if template.exists():
-        shutil.copy2(template, dst)
-        print("Created CLAUDE.md")
+    if not template.exists():
+        return None
+    content = template.read_text(encoding="utf-8")
+    rendered = render_root_instruction_text(content, adapter)
+    if adapter.agent_id == AGENT_CODEX:
+        rendered = _inject_agent_root_bootstrap(repo_root, rendered, adapter)
+    return rendered
+
+
+def _inject_agent_root_bootstrap(
+    repo_root: Path,
+    content: str,
+    adapter: AgentPublishAdapter,
+) -> str:
+    """Add selected-agent bootstrap text to generated root instructions."""
+    template_path = AGENT_ROOT_BOOTSTRAP_TEMPLATES.get(adapter.agent_id)
+    source_root = AGENT_RUNTIME_SOURCE_ROOTS.get(adapter.agent_id)
+    if template_path is None or source_root is None:
+        return content
+
+    template = repo_root / source_root / template_path
+    if not template.exists():
+        return content
+
+    bootstrap = template.read_text(encoding="utf-8")
+    if bootstrap.strip() and bootstrap.strip() in content:
+        return content
+
+    lines = content.splitlines(keepends=True)
+    if lines and lines[0].startswith("# "):
+        return "".join([lines[0], "\n", bootstrap, *lines[1:]])
+    return bootstrap + content
 
 
 def _verify_godot_path(godot_path: str) -> tuple[bool, str]:
@@ -371,7 +620,7 @@ def _verify_godot_path(godot_path: str) -> tuple[bool, str]:
     return True, version[0]
 
 
-def create_godotmaker_yaml(config_file: Path):
+def create_godotmaker_yaml(config_file: Path) -> bool:
     """Interactive godotmaker.yaml generation on first run.
 
     Re-prompts until the user provides a path that actually launches Godot.
@@ -381,7 +630,7 @@ def create_godotmaker_yaml(config_file: Path):
     """
     if config_file.exists():
         print("godotmaker.yaml already exists, skipping")
-        return
+        return True
 
     print()
     print("No godotmaker.yaml found. Let's create one.")
@@ -392,11 +641,18 @@ def create_godotmaker_yaml(config_file: Path):
     godot_path = ""
     for attempt in range(1, max_attempts + 1):
         try:
-            entered = input("godot_path: ").strip().strip('"').strip("'")
+            entered = (
+                input("godot_path: ")
+                .strip()
+                .lstrip("\ufeff")
+                .strip()
+                .strip('"')
+                .strip("'")
+            )
         except (EOFError, KeyboardInterrupt):
             print("\nAborted: godotmaker.yaml not created. "
                   "Re-run publish to set godot_path.")
-            return
+            return False
 
         if not entered:
             print("  Path is required — please enter the full path to Godot.")
@@ -414,22 +670,45 @@ def create_godotmaker_yaml(config_file: Path):
     else:
         print(f"\nGave up after {max_attempts} attempts. "
               f"godotmaker.yaml not created. Re-run publish to set godot_path.")
-        return
+        return False
 
+    config_file.parent.mkdir(parents=True, exist_ok=True)
     config_file.write_text(
         f'# Host-specific tool paths — not committed to git\n'
         f'godot_path: "{godot_path}"\n',
         encoding="utf-8",
     )
     print(f"Created {config_file}")
+    return True
 
 
-def create_project_config(target: Path):
-    """Create .godotmaker/config.yaml with default settings."""
+def _set_simple_yaml_value(path: Path, key: str, value: str) -> None:
+    """Set a top-level scalar key in a simple YAML file."""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    updated = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("#") or ":" not in stripped:
+            continue
+        current_key = stripped.split(":", 1)[0].strip()
+        if current_key == key:
+            lines[i] = f"{key}: {value}"
+            updated = True
+            break
+    if not updated:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append(f"{key}: {value}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def create_project_config(target: Path, agent: str = AGENT_CLAUDE_CODE):
+    """Create or update .godotmaker/config.yaml with project settings."""
     config_dir = target / ".godotmaker"
     config_file = config_dir / "config.yaml"
     if config_file.exists():
-        print(".godotmaker/config.yaml already exists, skipping")
+        _set_simple_yaml_value(config_file, "agent", agent)
+        print(".godotmaker/config.yaml already exists, updated agent")
         return
 
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -437,6 +716,7 @@ def create_project_config(target: Path):
         shutil.copy2(DEFAULT_CONFIG_TEMPLATE, config_file)
     else:
         config_file.write_text("# GodotMaker config — template not found\n", encoding="utf-8")
+    _set_simple_yaml_value(config_file, "agent", agent)
     print("Created .godotmaker/config.yaml")
 
 
@@ -524,6 +804,60 @@ def register_mcp(target: Path, godot_path: str):
             print("WARNING: godot-mcp registration failed. Register manually if needed.")
     except (subprocess.TimeoutExpired, OSError):
         print("WARNING: godot-mcp registration failed. Register manually if needed.")
+
+
+def register_codex_mcp(target: Path, godot_path: str) -> bool:
+    """Register godot-mcp for Codex via `codex mcp`.
+
+    Codex MCP configuration is managed by Codex, not by GodotMaker's `.agents/`
+    runtime files. This mirrors register_mcp()'s CLI-driven behavior while
+    using Codex's own MCP management command.
+    """
+    codex_cmd = (
+        shutil.which("codex")
+        or shutil.which("codex.cmd")
+        or shutil.which("codex.exe")
+    )
+    if not codex_cmd:
+        print("ERROR: codex CLI not found. Cannot register godot-mcp.")
+        print("  Install Codex, then run manually:")
+        print(f'  codex mcp add godot --env GODOT_PATH="{godot_path}" -- npx @coding-solo/godot-mcp')
+        return False
+
+    if not shutil.which("npx"):
+        print("ERROR: npx not found. Cannot register godot-mcp.")
+        print("  Install Node.js, then run manually:")
+        print(f'  codex mcp add godot --env GODOT_PATH="{godot_path}" -- npx @coding-solo/godot-mcp')
+        return False
+
+    try:
+        subprocess.run(
+            [codex_cmd, "mcp", "remove", "godot"],
+            cwd=str(target), capture_output=True, timeout=30,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+
+    print("Registering godot-mcp MCP server for Codex...")
+    cmd = [codex_cmd, "mcp", "add", "godot",
+           "--env", f"GODOT_PATH={godot_path}", "--"]
+
+    if sys.platform == "win32":
+        cmd.extend(["cmd", "/c", "npx", "@coding-solo/godot-mcp"])
+    else:
+        cmd.extend(["npx", "@coding-solo/godot-mcp"])
+
+    try:
+        result = subprocess.run(cmd, cwd=str(target), timeout=60)
+        if result.returncode == 0:
+            print("godot-mcp registered for Codex")
+            return True
+        else:
+            print("ERROR: Codex godot-mcp registration failed.")
+            return False
+    except (subprocess.TimeoutExpired, OSError):
+        print("ERROR: Codex godot-mcp registration failed.")
+        return False
 
 
 def _escape_permission_rule_content(content: str) -> str:
@@ -618,19 +952,25 @@ def ensure_git_repo(target: Path):
         print("WARNING: could not create initial commit. Run manually: git commit --allow-empty -m 'init'")
 
 
-def ensure_gitignore(target: Path):
-    """Ensure .gitignore covers .claude/ and .godotmaker/ runtime state.
+def ensure_gitignore(target: Path, agent: str = AGENT_CLAUDE_CODE):
+    """Ensure .gitignore covers local-only agent config and runtime state.
 
-    .claude/ is fully ignored (Claude Code config, not project code).
+    .claude/ is fully ignored (Claude Code config, not project code). Codex
+    `.agents/` is intentionally not ignored because Codex-managed git
+    worktrees need the published skills and runtime mapping from git.
     .godotmaker/ is selectively ignored: hooks and config are tracked,
     runtime state (metrics, session state) is ignored. This allows
     git worktrees to inherit hooks automatically.
     """
     gitignore = target / ".gitignore"
+    adapter = get_agent_adapter(agent)
 
     # Lines that must be present
+    agent_entries = []
+    if adapter.agent_id == AGENT_CLAUDE_CODE:
+        agent_entries.append(f"{adapter.project_config_root}/")
     entries_needed = [
-        ".claude/",
+        *agent_entries,
         ".godotmaker/state.json",
         ".godotmaker/metrics.jsonl",
         ".godotmaker/metrics_current.jsonl",
@@ -638,20 +978,24 @@ def ensure_gitignore(target: Path):
         ".godotmaker/applied_migrations.json",
     ]
 
-    # If upgrading from old blanket ignore, remove it
-    old_blanket = ".godotmaker/"
+    # If upgrading from old blanket ignores, remove them.
+    old_blankets = [".godotmaker/"]
+    if adapter.agent_id == AGENT_CODEX:
+        old_blankets.append(".agents/")
 
     if gitignore.exists():
         content = gitignore.read_text(encoding="utf-8", errors="replace")
         lines = content.splitlines()
         line_set = set(line.strip() for line in lines)
 
-        # Remove old blanket .godotmaker/ ignore
+        # Remove old blanket ignores managed by earlier publish versions.
         updated = False
-        if old_blanket in line_set:
-            lines = [line for line in lines if line.strip() != old_blanket]
-            line_set = set(line.strip() for line in lines)
-            updated = True
+        for old_blanket in old_blankets:
+            if old_blanket in line_set:
+                lines = [line for line in lines
+                         if line.strip() != old_blanket]
+                line_set = set(line.strip() for line in lines)
+                updated = True
 
         # Add missing entries
         missing = [e for e in entries_needed if e not in line_set]
@@ -666,6 +1010,27 @@ def ensure_gitignore(target: Path):
     else:
         gitignore.write_text("\n".join(entries_needed) + "\n", encoding="utf-8")
         print("Created .gitignore")
+
+
+def ensure_gitattributes(target: Path):
+    """Ensure generated shell scripts keep LF endings after git checkout."""
+    gitattributes = target / ".gitattributes"
+    entries_needed = [
+        "*.sh text eol=lf",
+    ]
+
+    if gitattributes.exists():
+        content = gitattributes.read_text(encoding="utf-8", errors="replace")
+        lines = content.splitlines()
+        line_set = set(line.strip() for line in lines)
+        missing = [entry for entry in entries_needed if entry not in line_set]
+        if missing:
+            lines.extend(missing)
+            gitattributes.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            print("Updated .gitattributes (LF shell scripts)")
+    else:
+        gitattributes.write_text("\n".join(entries_needed) + "\n", encoding="utf-8")
+        print("Created .gitattributes")
 
 
 def ensure_worktreeinclude(target: Path):
@@ -729,8 +1094,11 @@ def main():
         description="Publish GodotMaker skills into a target Godot project directory"
     )
     parser.add_argument("target", help="Path to the target Godot project directory")
+    parser.add_argument("--agent", choices=AGENT_CHOICES, default=AGENT_CLAUDE_CODE,
+                        help="Coding agent target to publish for "
+                             "(default: claude-code)")
     parser.add_argument("--force", action="store_true",
-                        help="Clean existing .claude/skills/ before publishing; "
+                        help="Clean existing agent skills before publishing; "
                              "skip upgrade confirmation prompts")
     args = parser.parse_args()
 
@@ -746,24 +1114,30 @@ def main():
     if not proceed:
         sys.exit(1)
 
-    config_dir = target / ".claude"
-    skills_target = config_dir / "skills"
+    agent = args.agent
+    adapter = get_agent_adapter(agent)
+    config_dir = adapter.project_config_dir(target)
+    skills_target = adapter.skill_dir(target)
     config_file = config_dir / "godotmaker.yaml"
 
     # MAJOR upgrade with --force: clean all framework-managed content
     if level == "MAJOR" and args.force:
         # Directories to wipe and recreate
         for d in [
-            skills_target,                      # .claude/skills/
-            config_dir / "agents",              # .claude/agents/
-            config_dir / "config",              # .claude/config/
-            config_dir / "templates",           # .claude/templates/
+            skills_target,                      # selected agent skills
+            adapter.agents_dir(target),          # selected agent agents refs
+            adapter.config_dir(target),          # selected agent config
+            adapter.templates_dir(target),       # selected agent templates
             target / ".godotmaker" / "hooks",   # .godotmaker/hooks/
             target / "tools",                   # tools/
         ]:
             if d.exists():
                 print(f"  Cleaning {d}")
                 rmtree_force(d)
+        runtime_refs_dir = adapter.runtime_references_dir(target)
+        if runtime_refs_dir is not None and runtime_refs_dir.exists():
+            print(f"  Cleaning {runtime_refs_dir}")
+            rmtree_force(runtime_refs_dir)
         # State files to remove
         for f in [
             target / ".godotmaker" / "state.json",
@@ -776,46 +1150,61 @@ def main():
                 f.unlink()
                 print(f"  Removed {f.name}")
         print("  Full rebuild: framework content cleaned.")
-        print("  Preserved: CLAUDE.md, godotmaker.yaml, config.yaml")
+        print("  Preserved: root agent instructions, godotmaker.yaml, config.yaml")
     elif args.force and skills_target.exists():
         print(f"Force: cleaning {skills_target}")
         rmtree_force(skills_target)
 
-    print(f"Publishing to: {target}")
+    print(f"Publishing to: {target} (agent: {agent})")
     skills_target.mkdir(parents=True, exist_ok=True)
 
     # Publish all components
-    publish_skills(repo_root, skills_target)
-    publish_shared_refs(repo_root, skills_target)
-    publish_directory(repo_root / "agents", config_dir / "agents", "agents/", "*.md")
+    publish_skills(repo_root, skills_target, agent)
+    publish_shared_refs(repo_root, skills_target, agent)
+    publish_runtime_references(repo_root, target, agent)
+    publish_directory(repo_root / "agents", adapter.agents_dir(target),
+                      "agents/", "*.md")
     publish_directory(repo_root / "tools", target / "tools", "tools/")
-    publish_directory(repo_root / "config", config_dir / "config", "config/", "*")
+    publish_directory(repo_root / "config", adapter.config_dir(target),
+                      "config/", "*")
     godotmaker_dir = target / ".godotmaker"
     godotmaker_dir.mkdir(parents=True, exist_ok=True)
     publish_directory(repo_root / "hooks", godotmaker_dir / "hooks", "hooks/")
-    deploy_settings(repo_root, config_dir, args.force)
-    publish_directory(repo_root / "templates", config_dir / "templates", "templates/", "*.md")
-    deploy_claude_md(repo_root, target)
+    if adapter.deploy_settings:
+        deploy_settings(repo_root, config_dir, args.force)
+    publish_directory(repo_root / "templates", adapter.templates_dir(target),
+                      "templates/", "*.md")
+    deploy_agent_instructions(repo_root, target, agent)
 
     # Interactive config generation
-    create_godotmaker_yaml(config_file)
-    create_project_config(target)
+    config_ready = create_godotmaker_yaml(config_file)
+    create_project_config(target, agent)
     deploy_stage_schemas(repo_root, target)
     create_project_dirs(target)
 
-    # Register MCP server
+    # Agent-specific CLI integrations.
     godot_path = read_godot_path(config_file)
-    register_mcp(target, godot_path)
-    register_godot_permissions(config_dir / "settings.json", godot_path)
+    if adapter.register_claude_mcp:
+        register_mcp(target, godot_path)
+    elif adapter.agent_id == AGENT_CODEX:
+        if not config_ready:
+            print("ERROR: Codex publish requires godotmaker.yaml before MCP "
+                  "registration can run.")
+            sys.exit(1)
+        if not register_codex_mcp(target, godot_path):
+            sys.exit(1)
+    if adapter.register_godot_permissions:
+        register_godot_permissions(config_dir / "settings.json", godot_path)
 
-    # Ensure .gitignore
-    ensure_gitignore(target)
+    # Ensure git metadata
+    ensure_gitignore(target, agent)
+    ensure_gitattributes(target)
 
-    # Ensure .worktreeinclude carries .claude/ into sub-agent worktrees.
-    # Must run after ensure_gitignore (so .claude/ is properly ignored from
-    # main tree) and before ensure_git_repo's initial commit (so the file
-    # is tracked from the start).
-    ensure_worktreeinclude(target)
+    # .worktreeinclude is Claude Code's documented worktree carry-over surface.
+    # Codex worktree semantics are not wired through this file, so avoid
+    # creating a misleading Codex rule until that adapter is verified.
+    if adapter.ensure_worktreeinclude:
+        ensure_worktreeinclude(target)
 
     # Initialize git repo with initial commit (required for worktree isolation)
     ensure_git_repo(target)

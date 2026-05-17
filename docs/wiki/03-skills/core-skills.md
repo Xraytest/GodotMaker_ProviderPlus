@@ -8,7 +8,7 @@ There are nine role skills, each responsible for one phase of game creation. You
 
 | Command | What it does | Needs | Produces |
 |---------|-------------|-------|---------|
-| `/gm-scaffold` | Creates a new Godot project with the right folder structure, required addons, and a first git commit | Nothing (run this once per project) | `project.godot`, `addons/`, initial `CLAUDE.md` |
+| `/gm-scaffold` | Creates a new Godot project with the right folder structure, required addons, and a first git commit | Nothing (run this once per project) | `project.godot`, `addons/`, initial `CLAUDE.md` or `AGENTS.md` |
 | `/gm-gdd` | Interviews you about the game, then writes the design documents and work plan | A scaffolded project | `GDD.md`, `PLAN.md`, `STRUCTURE.md`, `SCENES.md`, `ASSETS.md`, `TOC.md` |
 | `/gm-asset` | Generates missing art or analyses art you provide, so the build has visuals to work with | `ASSETS.md` from `/gm-gdd` | Art files in `assets/`, updated `ASSETS.md` |
 | `/gm-build` | Implements the game by sending tasks to worker sub-agents one batch at a time, with reviewers checking the result | Design documents from `/gm-gdd` | Game code in `src/`, `scenes/`, unit tests, end-to-end tests |

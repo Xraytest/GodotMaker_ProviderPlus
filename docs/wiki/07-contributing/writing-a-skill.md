@@ -1,6 +1,6 @@
 # Writing a Skill
 
-Skills are the instruction bundles that tell Claude what to do at each step of the pipeline. A skill is a folder containing a `SKILL.md` prompt, optional `references/` documents, and optional supporting files. When `publish.py` runs, every skill is copied flat into the target project's `.claude/skills/` folder and Claude Code picks them up automatically.
+Skills are the instruction bundles that tell the selected coding agent what to do at each step of the pipeline. A skill is a folder containing a `SKILL.md` prompt, optional `references/` documents, and optional supporting files. When `publish.py` runs, every skill is copied flat into the selected agent's project-local skill folder (`.claude/skills/` for Claude Code or `.agents/skills/` for Codex).
 
 ## What kind of skill am I writing?
 

@@ -48,20 +48,31 @@ cd GodotMaker
 pip install -r tools/requirements.txt
 python tools/check_env.py
 
-# 3. Deploy GodotMaker into a new folder for your game
+# 3. Deploy GodotMaker into a new folder for your game.
+# Choose the agent you want to use for this project.
+
+# Claude Code
 python tools/publish.py /path/to/my-game
 cd /path/to/my-game
 claude
+
+# Codex
+python tools/publish.py --agent codex /path/to/my-game
+cd /path/to/my-game
+codex
 ```
 
-Then inside Claude Code, type the nine commands in order, starting with `/gm-scaffold`. See [Your first game](https://RandallLiuXin.github.io/GodotMaker/wiki/01-getting-started/first-game/) for a full walk-through.
+Inside [Claude Code](https://claude.ai/code) or
+[Codex](https://openai.com/codex/), run the nine GodotMaker commands in order,
+starting with `/gm-scaffold` for Claude Code or `$gm-scaffold` for Codex.
+See [Your first game](https://RandallLiuXin.github.io/GodotMaker/wiki/01-getting-started/first-game/) for a full walk-through.
 
 ## What you'll need
 
 | Tool | Why |
 |---|---|
 | [Godot 4.5+](https://godotengine.org) (recommended; 4.3/4.4 still supported) | The game engine your project runs in |
-| [Claude Code](https://claude.ai/code) | The AI you talk to |
+| [Claude Code](https://claude.ai/code) or [Codex](https://openai.com/codex/) | The coding agent you talk to |
 | Python 3.10+ | Runs the helper scripts |
 | `GOOGLE_API_KEY` | Free tier; used to generate art for your game |
 

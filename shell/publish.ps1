@@ -1,5 +1,5 @@
 # Publish GodotMaker skills into a target Godot project directory.
-# Usage: .\shell\publish.ps1 [-Force|--force] <target_godot_project_dir>
+# Usage: .\shell\publish.ps1 [-Force|--force] [-Agent claude-code|codex|--agent <agent>] <target_godot_project_dir>
 #
 # On upgrade, compares VERSION against the target's .godotmaker/version:
 #   PATCH  -> auto-proceed
@@ -14,25 +14,35 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Script = Join-Path $RepoRoot "tools\publish.py"
 
-# Parse args manually to accept both -Force and --force
+# Parse args manually to accept both PowerShell-style and POSIX-style flags.
 $ForceFlag = $false
+$Agent = $null
 $Target = $null
 
-foreach ($a in $args) {
+for ($i = 0; $i -lt $args.Count; $i++) {
+    $a = $args[$i]
     if ($a -eq "-Force" -or $a -eq "--force") {
         $ForceFlag = $true
+    } elseif ($a -eq "-Agent" -or $a -eq "--agent") {
+        $i += 1
+        if ($i -ge $args.Count) {
+            Write-Host "Missing value for $a"
+            exit 1
+        }
+        $Agent = $args[$i]
     } elseif (-not $Target) {
         $Target = $a
     }
 }
 
 if (-not $Target) {
-    Write-Host "Usage: .\shell\publish.ps1 [-Force|--force] <target_godot_project_dir>"
+    Write-Host "Usage: .\shell\publish.ps1 [-Force|--force] [-Agent claude-code|codex|--agent <agent>] <target_godot_project_dir>"
     exit 1
 }
 
 $pyArgs = @($Script)
 if ($ForceFlag) { $pyArgs += "--force" }
+if ($Agent) { $pyArgs += @("--agent", $Agent) }
 $pyArgs += $Target
 
 & python @pyArgs

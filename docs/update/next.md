@@ -18,6 +18,7 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 ## Added
 
 - (WIP) Diagnostic log at `.godotmaker/log_agent_tool_debug.log` that records every phase of `log_agent_tool.py` so the next failure mode is localizable from artifacts.
+- `tools/publish.py` accepts `--agent claude-code|codex` and publishes the framework into the selected agent's project-local layout (`.claude/` or `.agents/`) instead of exporting both at once.
 - Each gm-* skill commits its stage outputs in When Done; new Stop hook `check_clean_workspace.py` reminds the agent once when the working tree is dirty at end of a skill.
 - `tools/seal_tag.py` — three subcommands (`archive` / `reset` / `bundle`) replacing the per-call fs/git work in `/gm-finalize` Steps 4/5/7/8.
 - `tools/run_verify.py` — wraps `/gm-verify`'s four mechanical checks (build / unit tests / lint / static check) into a single JSON-emitting command so the SKILL agent validates and reports instead of orchestrating four bash invocations.
