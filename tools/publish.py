@@ -1014,10 +1014,13 @@ def ensure_gitignore(target: Path, agent: str = AGENT_CLAUDE_CODE):
 
 
 def ensure_gitattributes(target: Path):
-    """Ensure generated shell scripts keep LF endings after git checkout."""
+    """Ensure generated projects have stable text line endings."""
     gitattributes = target / ".gitattributes"
     entries_needed = [
+        "* text=auto eol=lf",
         "*.sh text eol=lf",
+        "*.bat text eol=crlf",
+        "*.cmd text eol=crlf",
     ]
 
     if gitattributes.exists():
@@ -1028,7 +1031,7 @@ def ensure_gitattributes(target: Path):
         if missing:
             lines.extend(missing)
             gitattributes.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            print("Updated .gitattributes (LF shell scripts)")
+            print("Updated .gitattributes (stable text line endings)")
     else:
         gitattributes.write_text("\n".join(entries_needed) + "\n", encoding="utf-8")
         print("Created .gitattributes")

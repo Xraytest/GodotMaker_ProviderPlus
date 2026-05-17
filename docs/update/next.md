@@ -42,6 +42,7 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - `check_project.py --build` now fails when `godot_path` is missing because headless parse is part of the scaffold build gate.
 - Godot verification tools now prefer Godot's Windows console sibling for headless runs.
 - GdUnit verification commands now use the official `res://addons/gdUnit4/bin/GdUnitCmdTool.gd --add res://test/` form and ignore generated `reports/`.
+- Generated projects now include `.gitattributes` rules that normalize text line endings and keep Windows scripts on CRLF.
 
 ## Fixed
 

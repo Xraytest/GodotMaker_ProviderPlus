@@ -561,25 +561,40 @@ class TestEnsureGitignore:
 
 
 class TestEnsureGitattributes:
-    def test_creates_shell_lf_rule(self, tmp_path):
+    def test_creates_line_ending_rules(self, tmp_path):
         ensure_gitattributes(tmp_path)
         content = (tmp_path / ".gitattributes").read_text()
+        assert "* text=auto eol=lf" in content
         assert "*.sh text eol=lf" in content
+        assert "*.bat text eol=crlf" in content
+        assert "*.cmd text eol=crlf" in content
 
-    def test_appends_shell_lf_rule(self, tmp_path):
+    def test_appends_line_ending_rules(self, tmp_path):
         attrs = tmp_path / ".gitattributes"
         attrs.write_text("*.gd text\n", encoding="utf-8")
         ensure_gitattributes(tmp_path)
         content = attrs.read_text(encoding="utf-8")
         assert "*.gd text" in content
+        assert "* text=auto eol=lf" in content
         assert "*.sh text eol=lf" in content
+        assert "*.bat text eol=crlf" in content
+        assert "*.cmd text eol=crlf" in content
 
-    def test_keeps_existing_shell_lf_rule_once(self, tmp_path):
+    def test_keeps_existing_line_ending_rules_once(self, tmp_path):
         attrs = tmp_path / ".gitattributes"
-        attrs.write_text("*.sh text eol=lf\n", encoding="utf-8")
+        attrs.write_text(
+            "* text=auto eol=lf\n"
+            "*.sh text eol=lf\n"
+            "*.bat text eol=crlf\n"
+            "*.cmd text eol=crlf\n",
+            encoding="utf-8",
+        )
         ensure_gitattributes(tmp_path)
         content = attrs.read_text(encoding="utf-8")
+        assert content.count("* text=auto eol=lf") == 1
         assert content.count("*.sh text eol=lf") == 1
+        assert content.count("*.bat text eol=crlf") == 1
+        assert content.count("*.cmd text eol=crlf") == 1
 
 
 WORKTREEINCLUDE_ENTRIES = [".claude/", "!.claude/worktrees/"]
