@@ -112,15 +112,14 @@ This sub-stage exists in BOTH modes but does different work.
 
 ### 1c — Per-tag decomposition
 
-After GDD + ROADMAP are confirmed, **delegate to `decomposer` subagents**. Prefer the parallel plan below; fall back to the single-agent plan only if the runtime/tooling cannot dispatch multiple agents in one turn.
+After GDD + ROADMAP are confirmed, decompose the tag in **two phases**. PLAN.md
+is the canonical source of task IDs, current-tag mechanic IDs, affected files,
+assets needed, and verify expectations. Do not generate STRUCTURE.md,
+SCENES.md, ASSETS.md, or TOC.md in parallel with PLAN.md; those artifacts must
+read the finalized PLAN.md instead of guessing task mappings.
 
-**Preferred parallel dispatch.** Launch three `decomposer` agents in the same message, all with the same shared context plus a distinct `Work Package`. File ownership MUST be disjoint:
-
-1. `plan-package`: owns only `PLAN.md`.
-2. `architecture-package`: owns only `STRUCTURE.md` and `project.godot`.
-3. `scene-asset-package`: owns only `SCENES.md`, `ASSETS.md`, and `TOC.md`.
-
-All packages may read every input path and prior archive, but each package may write only its owned files. Do not ask one package to wait for another package's output. After all reports return, the lead performs Gate 1c from disk and edits any mismatches directly.
+**Phase A — PLAN first.** Launch one `decomposer` for `plan-package` only. It
+owns only `PLAN.md`.
 
 ```
 Agent({
@@ -129,6 +128,32 @@ Agent({
   model: "{decomposer_model from .godotmaker/config.yaml, default: sonnet}",
   prompt: "{shared brief below + Work Package: plan-package; Owned Files: PLAN.md}"
 })
+```
+
+After it returns, the lead performs **Gate 1c-A** from disk and edits PLAN.md
+directly if needed. PLAN.md must be stable before Phase B starts:
+
+- [ ] `PLAN.md` exists with `**Tag:**` header matching the current tag
+- [ ] Tag Mechanics section is populated with stable `[<Tag>-M<N>]` ids
+- [ ] Inherited Mechanics section is populated for subsequent mode, or omitted for v0.1.0
+- [ ] Risk/Main tasks have stable task IDs and all Task Status rows start as `pending`
+- [ ] Tasks list affected systems/scenes/assets clearly enough for downstream artifacts
+
+**Phase B — remaining artifacts in parallel.** After Gate 1c-A passes, launch
+the remaining decomposer packages in the same message. Both packages MUST read
+the finalized PLAN.md and MUST NOT invent task IDs, mechanic IDs, affected files,
+or asset mappings that are absent from PLAN.md.
+
+File ownership remains disjoint:
+
+1. `architecture-package`: owns only `STRUCTURE.md` and `project.godot`.
+2. `scene-asset-package`: owns only `SCENES.md`, `ASSETS.md`, and `TOC.md`.
+
+All Phase B packages may read every input path, prior archive, and finalized
+PLAN.md, but each package may write only its owned files. After all reports
+return, the lead performs Gate 1c-B from disk and edits any mismatches directly.
+
+```
 
 Agent({
   subagent_type: "decomposer",
@@ -145,7 +170,11 @@ Agent({
 })
 ```
 
-**Single-agent fallback.** If parallel dispatch is unavailable, launch one `decomposer` with no `Work Package`; it owns the full artifact set and runs all steps serially.
+**Single-agent fallback.** If dispatching decomposer subagents is unavailable,
+launch one `decomposer` with no `Work Package`; it owns the full artifact set and
+runs all steps serially. If Phase A succeeds but Phase B parallel dispatch is
+unavailable, launch one `decomposer` for the remaining artifact set after PLAN.md
+is finalized.
 
 Shared brief:
 
@@ -191,22 +220,23 @@ them into the new PLAN.md's Inherited Mechanics section verbatim}
 - which files / systems likely need refactoring (best-effort guess; decomposer
   decides the exact PLAN tasks)}
 
-### Work Package (preferred parallel mode only)
+### Work Package (two-phase mode only)
 {plan-package | architecture-package | scene-asset-package}
 
-### Owned Files (preferred parallel mode only)
+### Owned Files (two-phase mode only)
 {exact list of files this decomposer may write}
 ```
 
 The decomposer overwrites root `PLAN.md`, `STRUCTURE.md`, `SCENES.md` with the current tag's scope. For `ASSETS.md` it operates differently: in **initial mode** it writes the skeleton (Art Direction + empty tables); in **subsequent mode** it APPENDS new rows for assets this tag introduces (with `Tag = <current tag>`) and never modifies prior-tag rows. It does NOT touch `GDD.md`, `ROADMAP.md`, `MEMORY.md`, or any `docs/tags/` archive. It returns a short report; do NOT relay raw decomposer output to the user — run the gate first.
 
-**Gate 1c:**
-- [ ] `PLAN.md` exists with `**Tag:**` header matching the current tag, Tag Mechanics section populated, Inherited Mechanics section populated (or omitted entirely for v0.1.0), Task Status table with all `pending`
+**Gate 1c-B:**
+- [ ] Phase B packages used the finalized PLAN.md as the source of task IDs, mechanic IDs, affected files, asset mappings, and verify expectations
 - [ ] `STRUCTURE.md` exists with `**Tag:**` header, scoped to this tag's additions / refactors
 - [ ] `SCENES.md` exists with `**Tag:**` header, scoped to this tag
 - [ ] `ASSETS.md` exists and any new rows are tagged correctly (per `templates/ASSETS.md` and `gm-asset/SKILL.md`)
 - [ ] `TOC.md` updated (if decomposer touched it)
 - [ ] Parallel-only consistency check: PLAN task IDs referenced by STRUCTURE/SCENES/ASSETS exist in PLAN.md; every PLAN task's affected scene/system/asset appears in the corresponding artifact or is intentionally marked deferred.
+- [ ] Parallel-only mechanic ID check: every current-tag mechanic ID referenced by STRUCTURE/SCENES/ASSETS exists in final PLAN.md Tag Mechanics; no artifact references a guessed, renumbered, or stale current-tag mechanic ID.
 
 **Fallback when subagent doesn't finish.** If any gate item is unmet (whether the decomposer reported failure or just produced incomplete artifacts), do NOT respawn the subagent — instead, take over directly. Read whichever artifacts exist, identify the missing pieces, and write them using the same templates the decomposer would have used. The templates document their structure conventions.
 

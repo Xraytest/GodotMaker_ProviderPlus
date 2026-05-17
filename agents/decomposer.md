@@ -34,12 +34,22 @@ The lead does NOT want to see the file content come back. Your report is a short
 
 By default, when the brief has no `Work Package`, you own the full artifact set and run every step below.
 
-When the brief includes a `Work Package`, it is a parallel slice from `/gm-gdd`. In that mode:
+When the brief includes a `Work Package`, it is one slice from `/gm-gdd`'s
+two-phase decomposition flow:
 
 - Write ONLY the files listed in `Owned Files`.
-- You may read every input and any already-existing root artifact, but do not wait for sibling packages and do not modify their files.
+- `plan-package` runs alone in Phase A and creates the canonical PLAN.md.
+- `architecture-package` and `scene-asset-package` run in parallel only in
+  Phase B, after PLAN.md has been finalized by the lead.
+- Phase B packages MUST read the finalized root `PLAN.md` before writing
+  anything. PLAN.md is the source of truth for task IDs, current-tag mechanic
+  IDs, affected files, assets needed, and verify expectations.
+- Phase B packages MUST NOT invent task IDs, mechanic IDs, affected files, or
+  asset mappings that are absent from PLAN.md. If PLAN.md lacks information you
+  need, report it under `Open TODOs / Deferred` instead of guessing.
+- You may read every input and any already-existing root artifact, but do not
+  wait for sibling packages and do not modify their files.
 - If a step's output file is not in `Owned Files`, skip that write step entirely.
-- Keep references best-effort and explicit. If you need a PLAN task id that does not exist yet, use a stable descriptive reference and list it under `Open TODOs / Deferred`.
 - Report only your package's files in `Files Written`.
 
 Standard packages:
@@ -76,6 +86,9 @@ Required structure (matches the template):
 
 Run this step only when `ASSETS.md` is in `Owned Files`, or when no `Work Package` is provided.
 
+If this is `scene-asset-package`, read finalized PLAN.md first and use its
+`Assets Needed` / task-to-asset mapping as the source of truth.
+
 Follow the rules in `.claude/templates/ASSETS.md` (the file's own contract). Operationally:
 
 - **Initial mode:** Create from the template, populate Art Direction from GDD §4, seed the Asset Table with v0.1.0's assets. If `Manifest Path` is present, matching rows are `provided`; otherwise `MISSING`.
@@ -84,6 +97,11 @@ Follow the rules in `.claude/templates/ASSETS.md` (the file's own contract). Ope
 ### Step 3: SCENES.md
 
 Run this step only when `SCENES.md` is in `Owned Files`, or when no `Work Package` is provided.
+
+If this is `scene-asset-package`, read finalized PLAN.md first. Use its Tag
+Mechanics, Inherited Mechanics, task IDs, affected scenes, and asset mappings as
+the only cross-reference source; do not guess task IDs or mechanic IDs from GDD
+alone.
 
 SCENES.md is an **end-of-tag snapshot** (same model as STRUCTURE.md) — overwrite root from `.claude/templates/SCENES.md` in both modes. After this step the file lists every scene that exists in the game as of this tag, so `/gm-evaluate`'s per-scene visual cross-check covers inherited scenes too.
 
@@ -95,6 +113,11 @@ SCENES.md is an **end-of-tag snapshot** (same model as STRUCTURE.md) — overwri
 ### Step 4: STRUCTURE.md
 
 Run this step only when `STRUCTURE.md` is in `Owned Files`, or when no `Work Package` is provided.
+
+If this is `architecture-package`, read finalized PLAN.md first. Use its task
+IDs, affected systems, component hints, current-tag mechanic IDs, and refactor
+tasks as the only cross-reference source; do not derive a different task map
+from GDD/ROADMAP.
 
 STRUCTURE.md is **per-tag scope** — overwrite root from `.claude/templates/STRUCTURE.md` in both modes.
 

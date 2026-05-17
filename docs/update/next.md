@@ -38,7 +38,7 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - `gdunit-driver` SKILL adds a "Stub design" rule: a unit-test stub class must expose every property and method the system-under-test reads or calls on it, with a NodeRef-style WRONG/RIGHT example and a grep-before-submit check.
 - `decomposer` Step 5 patches `project.godot` for pixel-art games (detected from GDD §4): 480×270 viewport, 1920×1080 window override, integer stretch, Nearest filter, snap-to-pixel.
 - `/gm-gdd` initial mode now starts with a freeform user concept intake before structured GDD confirmation, so the interview can skip already-answered questions.
-- `/gm-gdd` can split decomposition across parallel `decomposer` work packages for PLAN, architecture/settings, and scene/assets/TOC outputs, with a lead consistency gate before completion.
+- `/gm-gdd` now decomposes in two phases so PLAN is finalized before architecture and scene/asset packages read its task and mechanic mappings.
 
 ## Fixed
 
