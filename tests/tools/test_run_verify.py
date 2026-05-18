@@ -42,6 +42,14 @@ def _make_proc(stdout: str = "", stderr: str = "", returncode: int = 0):
     return p
 
 
+def _write_gdunit_xml_from_cmd(cmd: list, xml: str) -> Path:
+    report_dir = Path(cmd[cmd.index("--report-directory") + 1])
+    results_xml = report_dir / "report_1" / "results.xml"
+    results_xml.parent.mkdir(parents=True, exist_ok=True)
+    results_xml.write_text(xml, encoding="utf-8")
+    return results_xml
+
+
 @pytest.fixture
 def project_dir(tmp_path: Path) -> Path:
     (tmp_path / ".godotmaker").mkdir()
@@ -142,8 +150,167 @@ def test_check_unit_tests_uses_official_gdunit_cmdtool_args():
     assert "--add" in cmd
     assert "res://test/" in cmd
     assert "--ignoreHeadlessMode" in cmd
+    assert "--report-directory" in cmd
     assert "--run-tests" not in cmd
     assert "--test-case" not in cmd
+
+
+def test_check_unit_tests_prefers_xml_top_level_over_first_suite_summary():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="report_1" tests="76" failures="1" errors="0" skipped="0">
+  <testsuite name="test_game_scene" tests="6" failures="0" errors="0" skipped="0">
+    <testcase name="test_ok" classname="test_game_scene" />
+  </testsuite>
+  <testsuite name="test_s_hud_prompt" tests="13" failures="1" errors="0" skipped="0">
+    <testcase name="test_game_over_modal_layout_keeps_score_and_button_separate" classname="test_s_hud_prompt">
+      <failure message="FAILED: res://test/test_s_hud_prompt.gd:255" type="FAILURE">
+        <![CDATA[Expecting to be less than or equal: 100]]>
+      </failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+"""
+
+    def fake_run(cmd, *args, **kwargs):
+        _write_gdunit_xml_from_cmd(cmd, xml)
+        return _make_proc(
+            stdout="Statistics: 6 test cases | 0 errors | 0 failures | PASSED\n",
+            returncode=0,
+        )
+
+    with patch.object(run_verify.subprocess, "run", side_effect=fake_run):
+        result, note = run_verify.check_unit_tests("/usr/bin/godot", Path("/x"))
+
+    assert result["result"] == "fail"
+    assert result["passed"] == 75
+    assert result["failed"] == 1
+    assert result["failures"] == [{
+        "test": (
+            "test_s_hud_prompt::"
+            "test_game_over_modal_layout_keeps_score_and_button_separate"
+        ),
+        "message": (
+            "FAILED: res://test/test_s_hud_prompt.gd:255: "
+            "Expecting to be less than or equal: 100"
+        ),
+    }]
+    assert note is None
+
+
+def test_check_unit_tests_xml_pass_counts_all_cases():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="report_1" tests="76" failures="0" errors="0" skipped="0">
+  <testsuite name="test_game_scene" tests="6" failures="0" errors="0" skipped="0" />
+  <testsuite name="test_s_hud_prompt" tests="13" failures="0" errors="0" skipped="0" />
+</testsuites>
+"""
+
+    def fake_run(cmd, *args, **kwargs):
+        _write_gdunit_xml_from_cmd(cmd, xml)
+        return _make_proc(stdout="not a summary\n", returncode=0)
+
+    with patch.object(run_verify.subprocess, "run", side_effect=fake_run):
+        result, note = run_verify.check_unit_tests("/usr/bin/godot", Path("/x"))
+
+    assert result == {"result": "pass", "passed": 76, "failed": 0, "failures": []}
+    assert note is None
+
+
+def test_check_unit_tests_xml_suite_errors_count_as_failed():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="report_1" tests="3" failures="0" skipped="0">
+  <testsuite name="test_game_scene" tests="1" failures="0" errors="0" skipped="0">
+    <testcase name="test_ok" classname="test_game_scene" />
+  </testsuite>
+  <testsuite name="test_s_hud_prompt" tests="2" failures="0" errors="1" skipped="0">
+    <testcase name="test_crashes" classname="test_s_hud_prompt">
+      <error message="ERROR: res://test/test_s_hud_prompt.gd:255" type="ERROR">
+        <![CDATA[Runtime error]]>
+      </error>
+    </testcase>
+  </testsuite>
+</testsuites>
+"""
+
+    def fake_run(cmd, *args, **kwargs):
+        _write_gdunit_xml_from_cmd(cmd, xml)
+        return _make_proc(stdout="not a summary\n", returncode=0)
+
+    with patch.object(run_verify.subprocess, "run", side_effect=fake_run):
+        result, note = run_verify.check_unit_tests("/usr/bin/godot", Path("/x"))
+
+    assert result["result"] == "fail"
+    assert result["passed"] == 2
+    assert result["failed"] == 1
+    assert result["failures"] == [{
+        "test": "test_s_hud_prompt::test_crashes",
+        "message": (
+            "ERROR: res://test/test_s_hud_prompt.gd:255: Runtime error"
+        ),
+    }]
+    assert note is None
+
+
+def test_check_unit_tests_xml_pass_exit_100_is_fail():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="report_1" tests="76" failures="0" errors="0" skipped="0" />
+"""
+
+    def fake_run(cmd, *args, **kwargs):
+        _write_gdunit_xml_from_cmd(cmd, xml)
+        return _make_proc(stdout="Exit code: 100\n", returncode=100)
+
+    with patch.object(run_verify.subprocess, "run", side_effect=fake_run):
+        result, note = run_verify.check_unit_tests("/usr/bin/godot", Path("/x"))
+
+    assert result["result"] == "fail"
+    assert result["failed"] == 1
+    assert "code 100" in result["failures"][0]["message"]
+    assert note is None
+
+
+def test_check_unit_tests_xml_pass_other_nonzero_is_error():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="report_1" tests="76" failures="0" errors="0" skipped="0" />
+"""
+
+    def fake_run(cmd, *args, **kwargs):
+        _write_gdunit_xml_from_cmd(cmd, xml)
+        return _make_proc(stdout="Exit code: 103\n", returncode=103)
+
+    with patch.object(run_verify.subprocess, "run", side_effect=fake_run):
+        result, note = run_verify.check_unit_tests("/usr/bin/godot", Path("/x"))
+
+    assert result == {"result": "error", "passed": 0, "failed": 0, "failures": []}
+    assert note["tool"] == "gdunit"
+    assert "code 103" in note["error"]
+
+
+def test_check_unit_tests_missing_xml_exit_100_is_fail():
+    with patch.object(run_verify.subprocess, "run") as run:
+        run.return_value = _make_proc(stdout="runner output without summary\n", returncode=100)
+        result, note = run_verify.check_unit_tests("/usr/bin/godot", Path("/x"))
+
+    assert result["result"] == "fail"
+    assert result["failed"] == 1
+    assert "code 100" in result["failures"][0]["message"]
+    assert note is None
+
+
+def test_check_unit_tests_fallback_uses_overall_summary_not_first_suite():
+    output = (
+        "Statistics: 6 test cases | 0 errors | 0 failures | PASSED\n"
+        "Overall Summary: 76 test cases | 0 errors | 1 failures | FAILED\n"
+        "Exit code: 100\n"
+    )
+    with patch.object(run_verify.subprocess, "run") as run:
+        run.return_value = _make_proc(stdout=output, returncode=100)
+        result, note = run_verify.check_unit_tests("/usr/bin/godot", Path("/x"))
+
+    assert result["result"] == "fail"
+    assert result["passed"] == 75
+    assert result["failed"] == 1
+    assert note is None
 
 
 def test_check_unit_tests_pass_with_pf_summary():

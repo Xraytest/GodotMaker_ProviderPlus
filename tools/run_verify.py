@@ -34,6 +34,8 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -155,6 +157,11 @@ _GDUNIT_SUMMARY_CASES = re.compile(
     r"(\d+)\s+test\s*cases?\s*\|\s*(\d+)\s+errors?\s*\|\s*(\d+)\s+failures?",
     re.IGNORECASE,
 )
+_GDUNIT_OVERALL_SUMMARY_CASES = re.compile(
+    r"Overall\s+Summary:.*?"
+    r"(\d+)\s+test\s*cases?\s*\|\s*(\d+)\s+errors?\s*\|\s*(\d+)\s+failures?",
+    re.IGNORECASE | re.DOTALL,
+)
 _GDUNIT_SUMMARY_PF = re.compile(
     r"Tests?\s+Passed:\s*(\d+).*?Tests?\s+Failed:\s*(\d+)",
     re.IGNORECASE | re.DOTALL,
@@ -168,40 +175,86 @@ _GDUNIT_FAILURE = re.compile(
 )
 
 
-def check_unit_tests(godot_path: str, project_dir: Path
-                     ) -> tuple[dict, dict | None]:
-    cmd = [
-        godot_path, "--headless",
-        "--path", str(project_dir),
-        "-s", "res://addons/gdUnit4/bin/GdUnitCmdTool.gd",
-        "--ignoreHeadlessMode",
-        "--add", "res://test/",
-    ]
+def _int_attr(element: ET.Element, name: str) -> int:
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=UNIT_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return (
-            {"result": "error", "passed": 0, "failed": 0, "failures": []},
-            _tooling_note(
-                tool="gdunit",
-                crashed_on="<headless-run>",
-                error=f"gdUnit4 timed out after {UNIT_TIMEOUT}s",
-            ),
-        )
-    except FileNotFoundError as ex:
-        return (
-            {"result": "error", "passed": 0, "failed": 0, "failures": []},
-            _tooling_note(
-                tool="gdunit",
-                crashed_on=godot_path,
-                error=f"godot binary not found: {ex}",
-            ),
-        )
+        return int(element.attrib.get(name, "0"))
+    except ValueError:
+        return 0
 
-    combined = (proc.stdout or "") + (proc.stderr or "")
 
-    m = _GDUNIT_SUMMARY_CASES.search(combined)
+def _strip_xml_text(text: str | None) -> str:
+    return " ".join((text or "").split())
+
+
+def _failure_message(node: ET.Element) -> str:
+    message = (node.attrib.get("message") or "").strip()
+    detail = _strip_xml_text(node.text)
+    if message and detail and detail not in message:
+        return f"{message}: {detail}"
+    return message or detail or node.tag
+
+
+def _parse_gdunit_xml(results_xml: Path) -> dict:
+    root = ET.parse(results_xml).getroot()
+    total = _int_attr(root, "tests")
+    failures = _int_attr(root, "failures")
+    if "errors" in root.attrib:
+        errors = _int_attr(root, "errors")
+    else:
+        errors = sum(
+            _int_attr(suite, "errors")
+            for suite in root
+            if suite.tag == "testsuite"
+        )
+    skipped = _int_attr(root, "skipped")
+    failed_count = failures + errors
+    passed_count = max(total - failed_count - skipped, 0)
+
+    failure_entries: list[dict] = []
+    for case in root.iter():
+        if case.tag != "testcase":
+            continue
+        test_name = case.attrib.get("name", "").strip()
+        class_name = case.attrib.get("classname", "").strip()
+        test_id = f"{class_name}::{test_name}" if class_name else test_name
+        for child in list(case):
+            if child.tag not in {"failure", "error"}:
+                continue
+            failure_entries.append({
+                "test": test_id,
+                "message": _failure_message(child),
+            })
+
+    if failed_count > 0 and not failure_entries:
+        failure_entries.append({
+            "test": "<gdunit>",
+            "message": (
+                f"gdUnit XML reported {failures} failures and {errors} errors "
+                f"without testcase details"
+            ),
+        })
+
+    return {
+        "result": "fail" if failed_count > 0 else "pass",
+        "passed": passed_count,
+        "failed": failed_count,
+        "failures": failure_entries,
+    }
+
+
+def _find_gdunit_results_xml(report_dir: Path) -> Path | None:
+    matches = list(report_dir.rglob("results.xml"))
+    if not matches:
+        return None
+    return max(matches, key=lambda p: p.stat().st_mtime)
+
+
+def _parse_gdunit_stdout(combined: str, returncode: int) -> dict | None:
+    m = _GDUNIT_OVERALL_SUMMARY_CASES.search(combined)
+    if not m:
+        matches = list(_GDUNIT_SUMMARY_CASES.finditer(combined))
+        m = matches[-1] if matches else None
+
     if m:
         total = int(m.group(1))
         errs = int(m.group(2))
@@ -210,21 +263,10 @@ def check_unit_tests(godot_path: str, project_dir: Path
         passed_count = max(total - failed_count, 0)
     else:
         m2 = _GDUNIT_SUMMARY_PF.search(combined)
-        if m2:
-            passed_count = int(m2.group(1))
-            failed_count = int(m2.group(2))
-        else:
-            return (
-                {"result": "error", "passed": 0, "failed": 0, "failures": []},
-                _tooling_note(
-                    tool="gdunit",
-                    crashed_on="<headless-run>",
-                    error=(
-                        "could not parse gdUnit4 summary line; runner may "
-                        "have crashed or test/ may be empty"
-                    ),
-                ),
-            )
+        if not m2:
+            return None
+        passed_count = int(m2.group(1))
+        failed_count = int(m2.group(2))
 
     failures: list[dict] = []
     for fm in _GDUNIT_FAILURE.finditer(combined):
@@ -233,16 +275,127 @@ def check_unit_tests(godot_path: str, project_dir: Path
             "message": fm.group(2).strip(),
         })
 
+    if returncode != 0 and failed_count == 0:
+        failed_count = 1
+        failures.append({
+            "test": "<gdunit>",
+            "message": f"gdUnit exited with code {returncode}",
+        })
+
     result = "fail" if failed_count > 0 else "pass"
-    return (
-        {
-            "result": result,
-            "passed": passed_count,
-            "failed": failed_count,
-            "failures": failures,
-        },
-        None,
-    )
+    return {
+        "result": result,
+        "passed": passed_count,
+        "failed": failed_count,
+        "failures": failures,
+    }
+
+
+def check_unit_tests(godot_path: str, project_dir: Path
+                     ) -> tuple[dict, dict | None]:
+    with tempfile.TemporaryDirectory(prefix="godotmaker-gdunit-") as report_dir:
+        report_path = Path(report_dir)
+        cmd = [
+            godot_path, "--headless",
+            "--path", str(project_dir),
+            "-s", "res://addons/gdUnit4/bin/GdUnitCmdTool.gd",
+            "--ignoreHeadlessMode",
+            "--add", "res://test/",
+            "--report-directory", str(report_path),
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=UNIT_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return (
+                {"result": "error", "passed": 0, "failed": 0, "failures": []},
+                _tooling_note(
+                    tool="gdunit",
+                    crashed_on="<headless-run>",
+                    error=f"gdUnit4 timed out after {UNIT_TIMEOUT}s",
+                ),
+            )
+        except FileNotFoundError as ex:
+            return (
+                {"result": "error", "passed": 0, "failed": 0, "failures": []},
+                _tooling_note(
+                    tool="gdunit",
+                    crashed_on=godot_path,
+                    error=f"godot binary not found: {ex}",
+                ),
+            )
+
+        results_xml = _find_gdunit_results_xml(report_path)
+        if results_xml:
+            try:
+                parsed_xml = _parse_gdunit_xml(results_xml)
+            except ET.ParseError as ex:
+                return (
+                    {"result": "error", "passed": 0, "failed": 0, "failures": []},
+                    _tooling_note(
+                        tool="gdunit",
+                        crashed_on=str(results_xml),
+                        error=f"could not parse gdUnit4 XML report: {ex}",
+                    ),
+                )
+            if proc.returncode != 0 and parsed_xml["result"] == "pass":
+                if proc.returncode == 100:
+                    parsed_xml["result"] = "fail"
+                    parsed_xml["failed"] = 1
+                    parsed_xml["failures"] = [{
+                        "test": "<gdunit>",
+                        "message": (
+                            "gdUnit exited with code 100 despite a passing "
+                            "XML report"
+                        ),
+                    }]
+                    return (parsed_xml, None)
+                return (
+                    {"result": "error", "passed": 0, "failed": 0, "failures": []},
+                    _tooling_note(
+                        tool="gdunit",
+                        crashed_on=str(results_xml),
+                        error=(
+                            f"gdUnit exited with code {proc.returncode} "
+                            "despite a passing XML report"
+                        ),
+                    ),
+                )
+            return (parsed_xml, None)
+
+        combined = (proc.stdout or "") + (proc.stderr or "")
+        parsed = _parse_gdunit_stdout(combined, proc.returncode)
+        if parsed:
+            return (parsed, None)
+
+        if proc.returncode == 100:
+            return (
+                {
+                    "result": "fail",
+                    "passed": 0,
+                    "failed": 1,
+                    "failures": [{
+                        "test": "<gdunit>",
+                        "message": (
+                            "gdUnit exited with code 100 but produced no "
+                            "parseable XML or stdout summary"
+                        ),
+                    }],
+                },
+                None,
+            )
+
+        return (
+            {"result": "error", "passed": 0, "failed": 0, "failures": []},
+            _tooling_note(
+                tool="gdunit",
+                crashed_on="<headless-run>",
+                error=(
+                    "could not parse gdUnit4 XML report or summary line; "
+                    "runner may have crashed or test/ may be empty"
+                ),
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------

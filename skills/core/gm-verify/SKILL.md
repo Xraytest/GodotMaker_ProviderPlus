@@ -48,8 +48,10 @@ What the script does:
 - Runs `<godot_path> --headless --quit` and parses `ERROR:` lines into
   `checks.build.errors[]`.
 - Runs `<godot_path> --headless ... res://addons/gdUnit4/bin/GdUnitCmdTool.gd
-  --ignoreHeadlessMode --add res://test/` and parses the summary line into
-  `checks.unit_tests.{passed, failed, failures[]}`.
+  --ignoreHeadlessMode --add res://test/ --report-directory <temp>` and
+  parses the generated JUnit XML into
+  `checks.unit_tests.{passed, failed, failures[]}`. Stdout is diagnostic
+  fallback only.
 - Stubs `checks.lint` as `pass` with `format_drift: null`. Do NOT
   re-enable here.
 - Delegates `checks.static_check` to
@@ -65,7 +67,7 @@ Before writing the report, validate. Block on any of these:
 - Any of the four `checks.{build,unit_tests,lint,static_check}`
   entries is absent
 - `result == "pass"` but `tooling_notes` is non-empty — re-run or escalate
-- `checks.unit_tests.passed + .failed == 0` — spot-check by running the gdUnit4 command directly
+- `checks.unit_tests.passed + .failed == 0` — spot-check by running the gdUnit4 command directly with `--report-directory <temp>`
 - Any `tooling_notes` entry whose `crashed_on` looks unrelated to the
   failing check
 
