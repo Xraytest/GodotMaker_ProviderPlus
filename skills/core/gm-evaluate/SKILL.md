@@ -98,7 +98,7 @@ All of these must pass for `result == "approve"`. Failure of any is a `critical_
 
    **Precondition — reference must exist.** Before calling visual-qa, confirm `references/scene_{name}.png` exists. If missing → record `critical_issue: "missing reference for scene_{name}"` and skip the visual-qa call for this scene. Do NOT degrade to Question mode against the screenshot alone.
 
-   **Context construction.** Pull the `Acceptance criteria` block from SCENES.md for this scene; paste it verbatim into the `Verify:` field. If the block is absent, fall back to the mechanic ids from PLAN.md Tag Mechanics + Inherited Mechanics that this scene exercises, each with its one-line description. Never leave `Requirements:` or `Verify:` as a placeholder.
+   **Context construction.** Pull the `Acceptance criteria` block from SCENES.md for this scene; paste it verbatim into the `Verify:` field. If the block is absent, fall back to the mechanic ids from PLAN.md Tag Mechanics + Inherited Mechanics that this scene exercises, each with its one-line description. Never leave `Requirements:` or `Verify:` as a placeholder. For deterministic setup screenshots, add `Visible state only; do not infer prior play history.` to `Verify:`.
 
    ```
    # Static scene

@@ -106,6 +106,8 @@ Use these rules before choosing the final verdict:
 - If Task Context and reference disagree, evaluate against Task Context and
   mention the disagreement.
 - Pure reference/style mismatch should be a `note`, not a failing verdict.
+- Evaluate visible screenshots and caller-provided `Verify:` criteria only.
+  Do not infer prior play history unless `Verify:` asks for it.
 
 ### Implementation Quality (static + dynamic)
 

@@ -5,6 +5,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "skills" / "core" / "visual-qa" / "scripts" / "visual_qa.py"
+VQA_SKILL = REPO_ROOT / "skills" / "core" / "visual-qa" / "SKILL.md"
+EVALUATE_SKILL = REPO_ROOT / "skills" / "core" / "gm-evaluate" / "SKILL.md"
 
 
 def _tree() -> ast.AST:
@@ -55,3 +57,11 @@ def test_visual_qa_log_writes_are_utf8():
         )
         assert encoding is not None, "append log writes must pass encoding"
         assert ast.literal_eval(encoding) == "utf-8"
+
+
+def test_visual_qa_contract_avoids_prior_history_inference():
+    vqa = VQA_SKILL.read_text(encoding="utf-8")
+    evaluate = EVALUATE_SKILL.read_text(encoding="utf-8")
+
+    assert "Do not infer prior play history" in vqa
+    assert "Visible state only; do not infer prior play history." in evaluate
