@@ -16,7 +16,7 @@ my-game/
 ├── ASSETS.md
 ├── TOC.md
 ├── MEMORY.md
-├── tests/
+├── test/
 ├── e2e/
 ├── CLAUDE.md
 ├── .claude/
@@ -67,7 +67,7 @@ These Markdown files are the "source of truth" the AI reads before making decisi
 
 GodotMaker generates tests alongside game code so problems can be caught early.
 
-**`tests/`** — Unit tests. Each test file checks one small piece of the game code in isolation (for example, "does the movement system move an entity the right distance in one frame?"). Run by `/gm-verify` automatically. You can also run them manually from the command line with Godot's headless mode.
+**`test/`** — Unit tests. Each test file checks one small piece of the game code in isolation (for example, "does the movement system move an entity the right distance in one frame?"). Run by `/gm-verify` automatically. You can also run them manually from the command line with Godot's headless mode.
 
 **`e2e/`** — End-to-end tests. These run the whole game and check whether it behaves correctly at the "player experience" level — does the ball actually bounce, does the score increment, does the game end when it should? Written by `/gm-evaluate`. The `e2e/screenshots/` subfolder holds captured frames from those test runs.
 

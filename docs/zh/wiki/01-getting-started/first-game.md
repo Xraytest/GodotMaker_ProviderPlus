@@ -49,7 +49,7 @@ claude
 
 **会发生什么：** AI 创建空的 Godot 项目结构——文件夹、必要插件（gecs 负责游戏逻辑，gdUnit4 负责测试），以及第一个 Git 提交。这一步不会问你任何问题，自动完成。
 
-**生成的文件：** `project.godot`、`addons/`、`src/`、`scenes/`、`assets/`、`tests/`、`e2e/conftest.py`。
+**生成的文件：** `project.godot`、`addons/`、`src/`、`scenes/`、`assets/`、`test/`、`e2e/conftest.py`。
 
 **怎么知道完成了：** Claude Code 打印出汇总信息并回到提示符。文件夹里会出现一个新的 `project.godot` 文件。
 
@@ -103,7 +103,7 @@ claude
 
 输出会很多，任务一条条发出去、一条条报回来，这很正常。
 
-**生成的文件：** `src/` 里的游戏代码、`scenes/` 里的场景文件、`tests/` 里的单元测试。
+**生成的文件：** `src/` 里的游戏代码、`scenes/` 里的场景文件、`test/` 里的单元测试。
 
 **怎么知道完成了：** AI 打印出构建汇总。如果有任务没通过检查，会在汇总里注明，留给 `/gm-fixgap` 处理。
 

@@ -15,7 +15,7 @@
 **什么时候运行：** 在一切开始之前，只运行一次。项目目录必须已存在但是空的（或者只有一个 `.git` 文件夹）。
 
 **背后发生了什么：**
-- 写入 `project.godot`、`addons/`、`src/`、`scenes/`、`assets/`、`e2e/`、`tests/`
+- 写入 `project.godot`、`addons/`、`src/`、`scenes/`、`assets/`、`e2e/`、`test/`
 - 安装并配置 `gecs` 和 `gdUnit4`
 - 创建 `e2e/conftest.py`（测试框架入口）
 
@@ -76,7 +76,7 @@
 - 只要本轮有任何 finding 被 ACCEPT，循环就回到派遣 Worker 阶段
 - 只有当 `PLAN.md` 里所有任务都标记为 `verified`，且最后一轮评审 ACCEPT 数为零，构建才结束
 
-**你得到什么：** `src/` 里的游戏代码、`scenes/` 里的场景、`tests/` 里的单元测试——全部限定在本 tag 的新增 / refactor 范围内。
+**你得到什么：** `src/` 里的游戏代码、`scenes/` 里的场景、`test/` 里的单元测试——全部限定在本 tag 的新增 / refactor 范围内。
 
 **需要知道的：** 在这个步骤里你无法自己写游戏代码——权限系统会阻止。主 Agent 负责协调，Worker 负责实际写代码。Worker 触动当前 tag 范围之外的文件，必须 `PLAN.md` 中有显式 refactor 任务点名那些文件；不允许"顺手清理"。如果同一个任务失败三次，构建会暂停并询问你下一步怎么做。
 
@@ -90,7 +90,7 @@
 
 **背后发生了什么：**
 - 无界面运行 Godot 构建，检查编译错误
-- 通过 `gdUnit4` 运行 `tests/` 里的所有单元测试
+- 通过 `gdUnit4` 运行 `test/` 里的所有单元测试
 - 通过 `tools/check_project.py` 跑静态项目检查（build/ecs/tests/plan/mcp 五项；e2e 检查归 Evaluator 阶段）
 - 把结构化结论写入 `.godotmaker/verify_report.json`（每次都写，无论 PASS 还是 FAIL）
 

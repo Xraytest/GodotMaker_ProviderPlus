@@ -110,7 +110,7 @@ The bundle JSON on stdout has:
 - `roadmap_entry` (heading + body from ROADMAP.md for `<Tag>`)
 - `plan_tag_mechanics` (list of `<Tag>-Mn` IDs)
 - `previous_tag` + `git_log_since_previous_tag` (`--oneline` slice)
-- `test_count.unit` (count of `tests/**/*.gd`) + `test_count.e2e` (count of `e2e/**/test_*.py`)
+- `test_count.unit` (count of `test/**/*.gd`) + `test_count.e2e` (count of `e2e/**/test_*.py`)
 
 Combine that with PLAN.md task table and `evaluation.json` `minor_issues`, and write `docs/tags/<Tag>/CHANGELOG.md` in this format:
 

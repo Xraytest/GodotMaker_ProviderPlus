@@ -15,7 +15,7 @@ The pipeline runs **per tag** (SemVer: v0.1.0, v0.2.0, …). One full pass throu
 **When to run it:** Once, before anything else. The project directory must exist but be empty (or have only a `.git` folder).
 
 **What happens behind the scenes:**
-- Writes `project.godot`, `addons/`, `src/`, `scenes/`, `assets/`, `e2e/`, `tests/`
+- Writes `project.godot`, `addons/`, `src/`, `scenes/`, `assets/`, `e2e/`, `test/`
 - Installs and configures `gecs` and `gdUnit4`
 - Creates `e2e/conftest.py` (the test harness entry point)
 
@@ -76,7 +76,7 @@ The pipeline runs **per tag** (SemVer: v0.1.0, v0.2.0, …). One full pass throu
 - If any findings were ACCEPTED, the cycle loops back to dispatching Workers
 - The build ends only when every task in `PLAN.md` is `verified` and the last review round added zero ACCEPTED tasks
 
-**What you get:** Game code in `src/`, scenes in `scenes/`, unit tests in `tests/` — all scoped to this tag's additions / refactors.
+**What you get:** Game code in `src/`, scenes in `scenes/`, unit tests in `test/` — all scoped to this tag's additions / refactors.
 
 **Things to know:** You cannot write game code yourself while in this step — the permission system blocks it. The main agent coordinates; Workers do the actual writing. Workers may touch files outside the current tag's scope only when `PLAN.md` has an explicit refactor task naming those files; "cleanup detours" are not allowed. If the same task fails three times, the build stops and asks you what to do.
 
@@ -90,7 +90,7 @@ The pipeline runs **per tag** (SemVer: v0.1.0, v0.2.0, …). One full pass throu
 
 **What happens behind the scenes:**
 - Runs the Godot headless build to check for compile errors
-- Runs all unit tests in `tests/` via `gdUnit4`
+- Runs all unit tests in `test/` via `gdUnit4`
 - Runs the static project check via `tools/check_project.py` (build/ecs/tests/plan/mcp; e2e gating is the Evaluator's job)
 - Writes the structured verdict to `.godotmaker/verify_report.json` (every run, pass or fail)
 

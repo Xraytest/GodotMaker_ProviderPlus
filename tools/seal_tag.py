@@ -195,6 +195,10 @@ def _count_files(directory: Path, pattern: str) -> int:
     return sum(1 for _ in directory.rglob(pattern))
 
 
+def _count_unit_tests(project_path: Path) -> int:
+    return _count_files(project_path / "test", "*.gd")
+
+
 def cmd_bundle(project_path: Path, tag: str) -> int:
     try:
         previous_tag, upper = _resolve_tag_anchors(project_path, tag)
@@ -208,7 +212,7 @@ def cmd_bundle(project_path: Path, tag: str) -> int:
             # split is LLM judgment (which test files belong to this tag), so bundle
             # provides the total and SKILL Step 8 narrates the split.
             "test_count": {
-                "unit": _count_files(project_path / "tests", "*.gd"),
+                "unit": _count_unit_tests(project_path),
                 "e2e": _count_files(project_path / "e2e", "test_*.py"),
             },
         }

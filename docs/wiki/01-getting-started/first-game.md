@@ -49,7 +49,7 @@ Everything from here happens inside that Claude Code session.
 
 **What to expect:** The AI creates the empty Godot project structure — the folders, the required add-ons (gecs for game logic, gdUnit4 for tests), and the first Git commit. You will not be asked questions at this step; it runs automatically.
 
-**What lands on disk:** `project.godot`, `addons/`, `src/`, `scenes/`, `assets/`, `tests/`, `e2e/conftest.py`.
+**What lands on disk:** `project.godot`, `addons/`, `src/`, `scenes/`, `assets/`, `test/`, `e2e/conftest.py`.
 
 **When you know it's done:** Claude Code prints a summary and returns to the prompt. You will see a new `project.godot` file in the folder.
 
@@ -103,7 +103,7 @@ After the interview, it writes all the planning documents: the Game Design Docum
 
 You will see a lot of output as tasks are dispatched and reported back. This is normal.
 
-**What lands on disk:** Game code in `src/`, scene files in `scenes/`, unit tests in `tests/`.
+**What lands on disk:** Game code in `src/`, scene files in `scenes/`, unit tests in `test/`.
 
 **When you know it's done:** The AI prints a build summary. If any tasks failed their checks, they are noted so `/gm-fixgap` can address them later.
 

@@ -182,9 +182,9 @@ def test_bundle_roadmap_entry_null_when_tag_absent(project_dir: Path):
 
 
 def test_bundle_counts_unit_and_e2e_tests(project_dir: Path):
-    (project_dir / "tests").mkdir()
-    (project_dir / "tests" / "test_jump.gd").write_text("")
-    (project_dir / "tests" / "test_dash.gd").write_text("")
+    (project_dir / "test").mkdir()
+    (project_dir / "test" / "test_jump.gd").write_text("")
+    (project_dir / "test" / "test_dash.gd").write_text("")
     (project_dir / "e2e").mkdir()
     (project_dir / "e2e" / "test_level1.py").write_text("")
     (project_dir / "e2e" / "conftest.py").write_text("")  # must not count
