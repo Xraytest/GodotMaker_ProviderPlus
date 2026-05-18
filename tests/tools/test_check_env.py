@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(
     "tools",
 ))
 
-from check_env import EnvCheck, parse_version, get_version
+from check_env import EnvCheck, get_version, parse_version
 
 
 class TestEnvCheck:
@@ -219,18 +219,188 @@ class TestCheckFunctions:
         assert len(r.failed) == 0
 
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "AIzaSyTestKey12345678"}, clear=False)
-    def test_check_api_keys_present(self):
+    def test_check_api_keys_present_for_configured_gemini(self):
         from check_env import check_api_keys
         r = EnvCheck()
-        check_api_keys(r)
+        check_api_keys(r, {"asset_image_model": "gemini:gemini-3.1-flash-image-preview"})
         assert any("GOOGLE_API_KEY set" in p for p in r.passed)
 
     @patch.dict(os.environ, {}, clear=True)
-    def test_check_api_keys_missing(self):
+    def test_check_api_keys_missing_for_configured_gemini(self):
         from check_env import check_api_keys
         r = EnvCheck()
         # Need to also clear GEMINI_API_KEY
         os.environ.pop("GOOGLE_API_KEY", None)
         os.environ.pop("GEMINI_API_KEY", None)
-        check_api_keys(r)
+        check_api_keys(r, {"asset_image_model": "gemini:gemini-3.1-flash-image-preview"})
         assert any("GOOGLE_API_KEY" in f for f in r.failed)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_check_api_keys_without_config_uses_native_defaults(self):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(r, agent="codex")
+
+        assert not r.failed
+        assert not any("GOOGLE_API_KEY" in f for f in r.failed)
+        assert any("native image generation" in p for p in r.passed)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_codex_image_model_on_codex_does_not_require_image_api_key(self):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "codex",
+                "vqa_model": "codex",
+                "asset_video_model": "grok:grok-imagine-video",
+            },
+            agent="codex",
+        )
+
+        assert not r.failed
+        assert any("active Codex runtime" in p for p in r.passed)
+        assert any("XAI_API_KEY not set" in w for w in r.warnings)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_openai_image_model_requires_openai_api_key(self):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "openai:gpt-image-2",
+                "vqa_model": "native",
+            },
+        )
+
+        assert any("OPENAI_API_KEY" in f for f in r.failed)
+        assert not any("GOOGLE_API_KEY" in f for f in r.failed)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_native_image_model_still_requires_configured_gemini_vqa_key(self):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "native",
+                "vqa_model": "gemini:gemini-2.5-flash",
+            },
+            agent="codex",
+        )
+
+        assert any("GOOGLE_API_KEY" in f for f in r.failed)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_claude_native_image_generation_warns(self):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "native",
+                "vqa_model": "native",
+            },
+            agent="claude-code",
+        )
+
+        assert not r.failed
+        assert any("native image generation for Claude Code" in w for w in r.warnings)
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_claude_native_vqa_inspection_can_pass(self):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "openai:gpt-image-2",
+                "vqa_model": "native",
+            },
+            agent="claude-code",
+        )
+
+        assert not r.failed
+        assert any("native image inspection" in p for p in r.passed)
+
+    @patch("check_env.shutil.which", return_value=None)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_claude_codex_image_model_fails_when_codex_cli_missing(self, mock_which):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "codex",
+                "vqa_model": "codex",
+            },
+            agent="claude-code",
+        )
+
+        assert any("Codex CLI" in f for f in r.failed)
+
+    @patch("check_env.shutil.which", return_value="/usr/bin/codex")
+    @patch.dict(os.environ, {}, clear=True)
+    def test_claude_codex_image_model_accepts_codex_cli(self, mock_which):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "codex",
+                "vqa_model": "codex",
+            },
+            agent="claude-code",
+        )
+
+        assert not r.failed
+        assert any("Codex CLI found" in p for p in r.passed)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_none_video_model_does_not_require_xai_key(self):
+        from check_env import check_api_keys
+
+        r = EnvCheck()
+        check_api_keys(
+            r,
+            {
+                "asset_image_model": "native",
+                "vqa_model": "native",
+                "asset_video_model": "none",
+            },
+            agent="codex",
+        )
+
+        assert not any("XAI_API_KEY" in f for f in r.failed)
+
+    def test_python_checks_xai_sdk_for_video_only_grok(self, monkeypatch):
+        from check_env import check_python
+
+        imported: list[str] = []
+
+        def fake_import(name):
+            imported.append(name)
+            return object()
+
+        monkeypatch.setattr("builtins.__import__", fake_import)
+        r = EnvCheck()
+        check_python(
+            r,
+            {
+                "asset_image_model": "native",
+                "vqa_model": "native",
+                "asset_video_model": "grok:grok-imagine-video",
+            },
+        )
+
+        assert "xai_sdk" in imported

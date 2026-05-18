@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Asset Generator CLI - creates images (Gemini / xAI Grok) and GLBs (Tripo3D).
+"""Asset Generator CLI - creates images and GLBs (Tripo3D).
 
 Subcommands:
-  image   Generate a PNG from a prompt (Gemini 5-15 cents or Grok 2 cents)
+  image   Generate a PNG from a prompt (Gemini / OpenAI / xAI Grok)
   video   Generate MP4 video from prompt + reference image (5 cents/sec, Grok)
   glb     Convert a PNG to a GLB 3D model via Tripo3D (30-60 cents)
 
@@ -21,7 +21,6 @@ BUDGET_FILE = Path("assets/budget.json")
 
 VIDEO_MODEL = "grok-imagine-video"
 VIDEO_COST_PER_SEC = 5  # cents
-DEFAULT_IMAGE_PROVIDER = "gemini"
 CONFIG_FILE = Path(".godotmaker/config.yaml")
 
 
@@ -120,6 +119,49 @@ GROK_ASPECT_RATIOS = [
 
 ALL_SIZES = ["512", "1K", "2K", "4K"]
 ALL_ASPECT_RATIOS = sorted(set(GEMINI_ASPECT_RATIOS + GROK_ASPECT_RATIOS))
+OPENAI_MODEL = "gpt-image-2"
+OPENAI_COSTS = {"1:1": 5, "portrait": 7, "landscape": 7}
+
+
+def _split_model_selector(selector: str, *, default_provider: str,
+                          default_model: str,
+                          allow_bare_model: bool = False) -> tuple[str, str]:
+    """Parse provider[:model] selectors while keeping provider-only aliases."""
+    raw = (selector or "").strip()
+    if not raw:
+        return default_provider, default_model
+    if ":" in raw:
+        provider, model = raw.split(":", 1)
+        provider = provider.strip()
+        model = model.strip()
+        if provider and model:
+            return provider, model
+    if raw in {"gemini", "openai", "grok", "native", "codex", "none"}:
+        defaults = {
+            "gemini": GEMINI_MODEL,
+            "openai": OPENAI_MODEL,
+            "grok": GROK_MODEL,
+            "native": "native",
+            "codex": "codex",
+            "none": "none",
+        }
+        return raw, defaults[raw]
+    if allow_bare_model:
+        return default_provider, raw
+    return "", raw
+
+
+def _legacy_image_model(config: dict[str, str]) -> str:
+    provider = config.get("asset_image_provider")
+    if provider == "gemini":
+        return f"gemini:{config.get('gemini_image_model') or GEMINI_MODEL}"
+    if provider == "grok":
+        return f"grok:{config.get('grok_image_model') or GROK_MODEL}"
+    if config.get("gemini_image_model"):
+        return f"gemini:{config['gemini_image_model']}"
+    if config.get("grok_image_model"):
+        return f"grok:{config['grok_image_model']}"
+    return provider or ""
 
 
 def _mime_for_image(path: Path) -> str:
@@ -220,29 +262,115 @@ def _generate_grok(args, output: Path, cost: int, model_name: str):
     result_json(True, path=str(output), cost_cents=cost)
 
 
+def _openai_size(size: str, aspect_ratio: str) -> tuple[str, int]:
+    if size != "1K":
+        result_json(False, error="OpenAI image generation supports size 1K only.")
+        sys.exit(1)
+    if aspect_ratio == "1:1":
+        return "1024x1024", OPENAI_COSTS["1:1"]
+    try:
+        left, right = aspect_ratio.split(":", 1)
+        landscape = float(left) >= float(right)
+    except ValueError:
+        landscape = True
+    if landscape:
+        return "1536x1024", OPENAI_COSTS["landscape"]
+    return "1024x1536", OPENAI_COSTS["portrait"]
+
+
+def _save_openai_b64(response, output: Path):
+    from PIL import Image
+
+    if not response.data or not response.data[0].b64_json:
+        result_json(False, error="No image returned")
+        sys.exit(1)
+    img = Image.open(io.BytesIO(base64.b64decode(response.data[0].b64_json)))
+    img.save(output, format="PNG")
+
+
+def _generate_openai(args, output: Path, cost: int, model_name: str):
+    from openai import OpenAI
+
+    api_size, _ = _openai_size(args.size, args.aspect_ratio)
+    client = OpenAI()
+    try:
+        if args.image:
+            ref_path = Path(args.image)
+            if not ref_path.exists():
+                result_json(False, error=f"Reference image not found: {ref_path}")
+                sys.exit(1)
+            with ref_path.open("rb") as image_file:
+                response = client.images.edit(
+                    model=model_name,
+                    image=image_file,
+                    prompt=args.prompt,
+                    size=api_size,
+                )
+        else:
+            response = client.images.generate(
+                model=model_name,
+                prompt=args.prompt,
+                size=api_size,
+            )
+    except Exception as e:
+        result_json(False, error=str(e))
+        sys.exit(1)
+
+    _save_openai_b64(response, output)
+    print(f"Saved: {output}", file=sys.stderr)
+    record_spend(cost, "openai")
+    result_json(True, path=str(output), cost_cents=cost)
+
+
 def cmd_image(args):
     config = _load_project_config()
-    backend = args.model or config.get("asset_image_provider") or DEFAULT_IMAGE_PROVIDER
-    if backend not in {"gemini", "grok"}:
+    selector = (
+        args.model
+        or config.get("asset_image_model")
+        or _legacy_image_model(config)
+    )
+    if not selector:
         result_json(False, error=(
-            "Invalid asset_image_provider in .godotmaker/config.yaml: "
-            f"{backend!r}. Use 'gemini' or 'grok'."
+            "No API-backed asset image model selected. The project default is "
+            "asset_image_model: native, which is handled by /gm-asset through "
+            "the active agent runtime. Pass --model gemini:<model>, "
+            "openai:<model>, or grok:<model> to use tools/asset_gen.py directly."
+        ))
+        sys.exit(1)
+    backend, model_name = _split_model_selector(
+        selector,
+        default_provider="gemini",
+        default_model=GEMINI_MODEL,
+    )
+    if backend in {"native", "codex"}:
+        result_json(False, error=(
+            f"asset_image_model {backend!r} is handled by the agent runtime, "
+            "not tools/asset_gen.py. Use /gm-asset with a runtime that supports "
+            "the selected provider, or choose gemini:<model>, openai:<model>, "
+            "or grok:<model>."
+        ))
+        sys.exit(1)
+    if backend not in {"gemini", "openai", "grok"}:
+        result_json(False, error=(
+            "Invalid asset_image_model in .godotmaker/config.yaml: "
+            f"{selector!r}. Use 'native', 'codex', 'gemini:<model>', "
+            "'openai:<model>', or 'grok:<model>'."
         ))
         sys.exit(1)
     size = args.size
-    gemini_model = config.get("gemini_image_model") or GEMINI_MODEL
-    grok_model = config.get("grok_image_model") or GROK_MODEL
 
     if backend == "gemini":
         if size not in GEMINI_SIZES:
             result_json(False, error=f"Gemini does not support size {size}. Use: {', '.join(GEMINI_SIZES)}")
             sys.exit(1)
         cost = GEMINI_COSTS[size]
-    else:
+    elif backend == "grok":
         if size not in GROK_SIZES:
             result_json(False, error=f"Grok does not support size {size}. Use: {', '.join(GROK_SIZES)}")
             sys.exit(1)
         cost = GROK_COST
+    else:
+        _, cost = _openai_size(size, args.aspect_ratio)
 
     check_budget(cost)
     output = Path(args.output)
@@ -254,17 +382,38 @@ def cmd_image(args):
     print(f"Generating image ({label})...", file=sys.stderr)
 
     if backend == "gemini":
-        _generate_gemini(args, output, cost, gemini_model)
+        _generate_gemini(args, output, cost, model_name)
+    elif backend == "grok":
+        _generate_grok(args, output, cost, model_name)
     else:
-        _generate_grok(args, output, cost, grok_model)
+        _generate_openai(args, output, cost, model_name)
 
 
 def cmd_video(args):
+    config = _load_project_config()
+    selector = config.get("asset_video_model") or config.get("grok_video_model")
+    backend, video_model = _split_model_selector(
+        selector or "none",
+        default_provider="grok",
+        default_model=VIDEO_MODEL,
+        allow_bare_model=True,
+    )
+    if backend == "none":
+        result_json(False, error=(
+            "asset_video_model is set to 'none'. Configure 'grok:<model>' "
+            "before running video generation."
+        ))
+        sys.exit(1)
+    if backend != "grok":
+        result_json(False, error=(
+            "Invalid asset_video_model in .godotmaker/config.yaml: "
+            f"{selector!r}. Use 'none' or 'grok:<model>'."
+        ))
+        sys.exit(1)
+
     import requests
     import xai_sdk
 
-    config = _load_project_config()
-    video_model = config.get("grok_video_model") or VIDEO_MODEL
     cost = args.duration * VIDEO_COST_PER_SEC
     check_budget(cost)
     output = Path(args.output)
@@ -346,15 +495,20 @@ def cmd_set_budget(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Asset Generator — images (Gemini / xAI Grok) and GLBs (Tripo3D)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Asset Generator - images (Gemini / OpenAI / xAI Grok) "
+            "and GLBs (Tripo3D)"
+        )
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_img = sub.add_parser("image", help="Generate a PNG image (Gemini 5-15 cents or Grok 2 cents)")
+    p_img = sub.add_parser("image", help="Generate a PNG image (Gemini / OpenAI / xAI Grok)")
     p_img.add_argument("--prompt", required=True, help="Full image generation prompt")
-    p_img.add_argument("--model", choices=["gemini", "grok"], default=None,
-                       help="Backend override: gemini (default from config, 5-15 cents, precise prompt following) or grok (2 cents, fast, simple images).")
+    p_img.add_argument("--model", default=None,
+                       help="Model override: gemini[:model], openai[:model], or grok[:model].")
     p_img.add_argument("--size", choices=ALL_SIZES, default="1K",
-                       help="Resolution. Grok: 1K, 2K. Gemini: 512, 1K, 2K, 4K. Default: 1K.")
+                       help="Resolution. OpenAI: 1K. Grok: 1K, 2K. Gemini: 512, 1K, 2K, 4K. Default: 1K.")
     p_img.add_argument("--aspect-ratio", choices=ALL_ASPECT_RATIOS, default="1:1",
                        help="Aspect ratio. Default: 1:1")
     p_img.add_argument("--image", default=None, help="Reference image for image-to-image edit")
