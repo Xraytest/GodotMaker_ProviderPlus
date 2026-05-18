@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Visual QA — analyze game screenshots via Gemini Flash.
+"""Visual QA — analyze game screenshots via Gemini or OpenAI models.
 
 Three modes:
   Static:   visual_qa.py [--context "..."] reference.png screenshot.png
@@ -12,25 +12,54 @@ Question mode: free-form question + any number of screenshots. No reference need
 
 --context: Task context (Goal, Requirements, Verify) for goal verification.
 --question: Free-form question about the screenshots (replaces reference-based modes).
---model: Override model (default: gemini-2.5-flash).
+--model: Override model selector (default: gemini:gemini-2.5-flash).
 --log: Path to JSONL log file for debug logging.
-Requires: GEMINI_API_KEY or GOOGLE_API_KEY.
+Requires: GEMINI_API_KEY / GOOGLE_API_KEY for Gemini, or OPENAI_API_KEY for OpenAI.
 """
 
+import base64
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
-from google import genai
-from google.genai import types
 
 PROMPTS_DIR = Path(__file__).parent
 STATIC_PROMPT = PROMPTS_DIR / "static_prompt.md"
 DYNAMIC_PROMPT = PROMPTS_DIR / "dynamic_prompt.md"
 QUESTION_PROMPT = PROMPTS_DIR / "question_prompt.md"
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini:gemini-2.5-flash"
+
+
+def _mime_for_image(path: Path) -> str:
+    return {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".webp": "image/webp",
+    }.get(path.suffix.lower(), "image/png")
+
+
+def _image_data_url(path: Path) -> str:
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{_mime_for_image(path)};base64,{b64}"
+
+
+def _split_model_selector(selector: str) -> tuple[str, str]:
+    raw = (selector or DEFAULT_MODEL).strip()
+    if ":" in raw:
+        provider, model = raw.split(":", 1)
+        if provider and model:
+            return provider, model
+    if raw == "gemini":
+        return "gemini", "gemini-2.5-flash"
+    if raw == "openai":
+        return "openai", "gpt-5.5"
+    if raw in {"native", "codex"}:
+        print(
+            f"Error: {raw} VQA is handled by the agent runtime, not visual_qa.py",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return "gemini", raw
 
 
 def log_entry(log_path, *, mode, model, query, files, output):
@@ -53,7 +82,7 @@ def main():
     args = sys.argv[1:]
     context = None
     question = None
-    model = DEFAULT_MODEL
+    model_selector = DEFAULT_MODEL
     log_path = None
 
     # Parse named flags
@@ -65,7 +94,7 @@ def main():
             question = args[1]
             args = args[2:]
         elif args[0] == "--model":
-            model = args[1]
+            model_selector = args[1]
             args = args[2:]
         elif args[0] == "--log":
             log_path = args[1]
@@ -88,14 +117,6 @@ def main():
         prompt += f"\n\n## Question\n\n{question}\n"
         if context:
             prompt += f"\n## Additional Context\n\n{context}\n"
-
-        client = genai.Client()
-        contents: list[types.Part | str] = [prompt]
-
-        for i, p in enumerate(paths, 1):
-            label = "Screenshot:" if len(paths) == 1 else f"Frame {i}:"
-            contents.append(label)
-            contents.append(types.Part.from_bytes(data=p.read_bytes(), mime_type="image/png"))
 
         mode = "question"
         query = question
@@ -120,48 +141,88 @@ def main():
         if context:
             prompt += f"\n\n## Task Context\n\n{context}\n"
 
-        client = genai.Client()
-        contents = [prompt]
-
-        contents.append("Reference (visual target):")
-        contents.append(types.Part.from_bytes(data=paths[0].read_bytes(), mime_type="image/png"))
-
         if static:
-            contents.append("Game screenshot:")
-            contents.append(types.Part.from_bytes(data=paths[1].read_bytes(), mime_type="image/png"))
             mode = "static"
             desc = "static (reference + screenshot)"
         else:
-            for i, p in enumerate(paths[1:], 1):
-                contents.append(f"Frame {i}:")
-                contents.append(types.Part.from_bytes(data=p.read_bytes(), mime_type="image/png"))
             mode = "dynamic"
             desc = f"dynamic (reference + {len(paths) - 1} frames)"
 
         query = context or ""
 
-    print(f"Analyzing {desc} with {model}...", file=sys.stderr)
+    provider, model = _split_model_selector(model_selector)
+    full_model = f"{provider}:{model}"
+    print(f"Analyzing {desc} with {full_model}...", file=sys.stderr)
     try:
-        response = client.models.generate_content(
-            model=model,
-            contents=contents,  # type: ignore[arg-type]
-            config=types.GenerateContentConfig(
-                media_resolution=types.MediaResolution.MEDIA_RESOLUTION_HIGH,
-            ),
-        )
+        if provider == "gemini":
+            from google import genai
+            from google.genai import types
+
+            client = genai.Client()
+            contents: list[types.Part | str] = [prompt]
+            if question:
+                for i, p in enumerate(paths, 1):
+                    label = "Screenshot:" if len(paths) == 1 else f"Frame {i}:"
+                    contents.append(label)
+                    contents.append(types.Part.from_bytes(data=p.read_bytes(), mime_type=_mime_for_image(p)))
+            else:
+                contents.append("Reference (visual target):")
+                contents.append(types.Part.from_bytes(data=paths[0].read_bytes(), mime_type=_mime_for_image(paths[0])))
+                if mode == "static":
+                    contents.append("Game screenshot:")
+                    contents.append(types.Part.from_bytes(data=paths[1].read_bytes(), mime_type=_mime_for_image(paths[1])))
+                else:
+                    for i, p in enumerate(paths[1:], 1):
+                        contents.append(f"Frame {i}:")
+                        contents.append(types.Part.from_bytes(data=p.read_bytes(), mime_type=_mime_for_image(p)))
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,  # type: ignore[arg-type]
+                config=types.GenerateContentConfig(
+                    media_resolution=types.MediaResolution.MEDIA_RESOLUTION_HIGH,
+                ),
+            )
+            output = response.text or ""
+        elif provider == "openai":
+            from openai import OpenAI
+
+            client = OpenAI()
+            content = [{"type": "input_text", "text": prompt}]
+            if question:
+                for i, p in enumerate(paths, 1):
+                    label = "Screenshot:" if len(paths) == 1 else f"Frame {i}:"
+                    content.append({"type": "input_text", "text": label})
+                    content.append({"type": "input_image", "image_url": _image_data_url(p)})
+            else:
+                content.append({"type": "input_text", "text": "Reference (visual target):"})
+                content.append({"type": "input_image", "image_url": _image_data_url(paths[0])})
+                if mode == "static":
+                    content.append({"type": "input_text", "text": "Game screenshot:"})
+                    content.append({"type": "input_image", "image_url": _image_data_url(paths[1])})
+                else:
+                    for i, p in enumerate(paths[1:], 1):
+                        content.append({"type": "input_text", "text": f"Frame {i}:"})
+                        content.append({"type": "input_image", "image_url": _image_data_url(p)})
+            response = client.responses.create(
+                model=model,
+                input=[{"role": "user", "content": content}],
+            )
+            output = getattr(response, "output_text", "") or ""
+        else:
+            print(f"Error: unsupported VQA provider: {provider}", file=sys.stderr)
+            sys.exit(1)
     except Exception as e:
-        print(f"Error: Gemini API call failed: {e}", file=sys.stderr)
+        print(f"Error: {provider} API call failed: {e}", file=sys.stderr)
         sys.exit(1)
 
-    if not response.text:
-        print("Error: Gemini returned no text (possible safety block)", file=sys.stderr)
+    if not output:
+        print(f"Error: {provider} returned no text (possible safety block)", file=sys.stderr)
         sys.exit(1)
 
-    output = response.text
     print(output)
 
     if log_path:
-        log_entry(log_path, mode=mode, model=model, query=query,
+        log_entry(log_path, mode=mode, model=full_model, query=query,
                   files=[str(p) for p in paths], output=output)
 
 
