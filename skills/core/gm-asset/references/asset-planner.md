@@ -64,7 +64,9 @@ Craft each prompt for its specific goal. The art direction tells you the visual 
 
 #### Backend selection
 
-Use Gemini (the default provider unless project config says otherwise) where prompt precision matters — reference images, character design, 3D model references, animated sprite refs/poses, backgrounds with precise layout. Use Grok (`--model grok`) for textures, simple objects, item kits, and simple scenic backgrounds (sky, clouds, abstract) only when `XAI_API_KEY` is configured.
+Read `.godotmaker/config.yaml` and use `asset_image_model` as the default image path. `native` uses the active runtime-native image-generation provider/tool. `codex` uses Codex runtime-native image generation. API-backed selectors use `tools/asset_gen.py image --model <selector>`.
+
+Use Gemini or another precise provider where prompt precision matters: reference images, character design, 3D model references, animated sprite refs/poses, and backgrounds with exact layout. Use Grok (`grok:<model>`) for textures, simple objects, item kits, and simple scenic backgrounds only when `XAI_API_KEY` is configured. Use OpenAI (`openai:<model>`) when the project is configured for OpenAI Images API. Missing API keys are hard failures; do not silently switch providers.
 
 #### Using image references for consistency
 

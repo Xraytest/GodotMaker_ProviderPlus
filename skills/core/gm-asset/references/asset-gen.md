@@ -1,21 +1,23 @@
 # Asset Generator
 
-Generate PNG images (Gemini or xAI Grok) and GLB 3D models (Tripo3D) from text prompts.
+Generate PNG images with API-backed providers (Gemini, OpenAI, or xAI Grok) and GLB 3D models (Tripo3D) from text prompts. Use `/gm-asset` runtime mapping for runtime-native image generation.
 
 ## Models
 
 | Model | Flag | Cost | Best for |
 |-------|------|------|----------|
 | `gemini-3.1-flash-image-preview` | `--model gemini` | 5-15¢ (by size) | Precise prompt following — references, characters, backgrounds, 3D refs |
+| `gpt-image-2` | `--model openai` | 5-7¢ (local budget model) | OpenAI Images API generation/editing |
 | `grok-imagine-image` | `--model grok` | 2¢ | High-quality but imprecise — textures, simple objects, item kits |
 
 **When to use which:**
 - **Gemini** — reference images, character design, 3D model references, animated sprite refs/poses, backgrounds with precise layout. Gemini costs more but reliably produces what you described.
+- **OpenAI** — image generation/editing when the project is configured for OpenAI Images API.
 - **Grok** — textures, simple objects, item kits, props, simple scenic backgrounds (sky, clouds, abstract). Produces high-quality (even photographic) output but often defaults to common interpretations instead of following specific instructions. Great when exact prompt adherence doesn't matter.
 
 Project default is controlled by `.godotmaker/config.yaml`'s
-`asset_image_provider` field and ships as `gemini`. Use `--model grok`
-only when `XAI_API_KEY` is configured and prompt precision is less important.
+`asset_image_model` field. `native` and `codex` are runtime providers and are
+not valid `tools/asset_gen.py` backends.
 
 ### Gemini sizes and costs
 
@@ -37,13 +39,14 @@ python3 tools/asset_gen.py image \
   --prompt "the full prompt" -o assets/img/car.png
 ```
 
-`--model` (default from `.godotmaker/config.yaml`): `gemini` (5-15¢ by size), `grok` (2¢)
-`--size` (default `1K`): Grok: `1K`, `2K`. Gemini: `512`, `1K`, `2K`, `4K`.
-`--aspect-ratio` (default `1:1`): varies by backend — both support `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`
+`--model` (default from `.godotmaker/config.yaml`): `gemini`, `openai`, `grok`, or provider-prefixed selectors such as `openai:gpt-image-2`.
+`--size` (default `1K`): OpenAI: `1K`. Grok: `1K`, `2K`. Gemini: `512`, `1K`, `2K`, `4K`.
+`--aspect-ratio` (default `1:1`): varies by backend.
 
 Typical combos:
 - `--model gemini --size 1K` — reference images, character sprites, 3D refs (7¢)
 - `--model gemini --size 2K --aspect-ratio 16:9` — backgrounds, title screens (10¢)
+- `--model openai --size 1K` — OpenAI image generation/editing
 - `--model grok` — textures, simple objects, item kits (2¢)
 
 ### Remove background

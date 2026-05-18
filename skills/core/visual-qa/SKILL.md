@@ -1,8 +1,8 @@
 ---
 name: visual-qa
 description: |
-  Visual quality assurance — analyze game screenshots for defects, compare against reference, check motion in frame sequences.
-  Supports Gemini Flash (default), native Claude vision, or both with aggregated verdict.
+  Visual quality assurance: analyze game screenshots for defects, compare against reference, check motion in frame sequences.
+  Supports runtime-native inspection plus Gemini or OpenAI API-backed VQA.
 context: fork
 ---
 
@@ -22,9 +22,19 @@ ambiguous, or logically false.
 
 ## Backend
 
-- **Default (Claude native):** Read every image with the Read tool, analyze directly using the criteria below. No external script needed.
-- **`--gemini`** flag in arguments: Use Gemini Flash — run the script below. All queries go to Gemini 2.5 Flash.
-- **`--both`** flag in arguments: Do Claude native analysis first, then run Gemini script. Aggregate verdicts (details below).
+Read `.godotmaker/config.yaml` for model selection:
+
+- `vqa_model`: primary VQA backend. Supported values are `native`, `codex`, `gemini:<model>`, and `openai:<model>`.
+- `vqa_fallback_model`: fallback when the primary backend is unavailable. Supported values are `native`, `codex`, and `none`.
+
+Runtime-native VQA means direct image inspection by the selected runtime provider. `native` uses the active agent runtime. `codex` uses Codex image inspection, including from a Claude Code orchestration when Codex is available. API-backed VQA runs `${CLAUDE_SKILL_DIR}/scripts/visual_qa.py` with `--model <vqa_model>`. Do not silently switch providers except for the explicit `vqa_fallback_model` path.
+
+Argument flags override config for a single call:
+
+- `--native`: use runtime-native image inspection only.
+- `--gemini`: run the script with the configured Gemini selector, or `gemini:gemini-2.5-flash` if config uses another provider.
+- `--openai`: run the script with the configured OpenAI selector, or `openai:gpt-5.5` if config uses another provider.
+- `--both`: run native first, then the configured API-backed model. Aggregate verdicts.
 
 ## Mode Detection
 
@@ -43,9 +53,9 @@ If a reference path appears in the args but the file does not exist on disk → 
 
 Reject any other argv shapes (`--screenshot <file> --requirements "..."` and similar).
 
-## Claude Native Execution (Default)
+## Runtime-Native Execution
 
-Read every image file referenced in the arguments using the Read tool. Analyze using the criteria and output format below. Never look at code — only images.
+Read every image file referenced in the arguments using the active runtime image-reading path. Analyze using the criteria and output format below. Never look at code — only images.
 
 After producing output, append a debug log entry:
 
@@ -54,19 +64,23 @@ printf '{"ts":"%s","mode":"MODE","model":"native","query":"QUERY","files":["FILE
   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${VQA_LOG:-.vqa.log}"
 ```
 
-## Gemini Execution (`--gemini`)
+## API-Backed Execution
 
 Parse the arguments to construct the command. The script is at `${CLAUDE_SKILL_DIR}/scripts/visual_qa.py`.
 
 First, detect the available Python command — run `python3 --version` and `python --version`, then use whichever succeeds. Cache the result for the session.
 
-**Model selection:** Check `.godotmaker/config.yaml` for a `vqa_model` field. If present, pass it as `--model <value>`. If the file or field doesn't exist, omit `--model` (the script defaults to `gemini-2.5-flash`).
+**Model selection:** Check `.godotmaker/config.yaml` for `vqa_model`. If present and API-backed (`gemini:<model>` or `openai:<model>`), pass it as `--model <value>`. If the file or field does not exist, omit `--model` (the script defaults to `gemini:gemini-2.5-flash`). If `vqa_model` is `native` or `codex`, use runtime-native execution instead of the script unless an explicit API flag was requested.
 
 ```bash
 # Read model from config (if exists)
 VQA_MODEL=$(grep -oP 'vqa_model:\s*\K\S+' .godotmaker/config.yaml 2>/dev/null || echo "")
 MODEL_FLAG=""
-[ -n "$VQA_MODEL" ] && MODEL_FLAG="--model $VQA_MODEL"
+case "$VQA_MODEL" in
+  native|codex|"") MODEL_FLAG="" ;;
+  gemini:*|openai:*) MODEL_FLAG="--model $VQA_MODEL" ;;
+  *) echo "Unsupported vqa_model for API-backed visual_qa.py: $VQA_MODEL" >&2; exit 1 ;;
+esac
 
 # Static
 PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log ${VQA_LOG:-.vqa.log} $MODEL_FLAG [--context "Goal: ... Requirements: ... Verify: ..."] reference.png screenshot.png
@@ -80,16 +94,18 @@ PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log ${VQA_LOG:-.vqa.log} $MODE
 
 (`PYTHON` = whichever command worked above.) Always pass `--log`. Use `.vqa.log` unless the caller provides a log path. Print the script output as your response.
 
+If the configured API-backed model is unavailable and `vqa_fallback_model` is `native` or `codex`, switch to Runtime-Native Execution and record the fallback in the log entry's `model` field. If `vqa_fallback_model` is `none`, stop with an error instead of silently changing providers.
+
 ## Aggregated Mode (`--both`)
 
-1. Read all images with Read tool, do Claude native analysis using criteria below
-2. Run Gemini script, capture output
+1. Read all images with Read tool, do runtime-native analysis using criteria below
+2. Run the configured API-backed script, capture output
 3. Produce combined verdict:
    - Either says `fail` → `fail`
    - Either says `warning` and neither `fail` → `warning`
    - Both `pass` → `pass`
 4. Merge issue lists from both, deduplicate by location + description
-5. Label each issue source: `[gemini]`, `[native]`, or `[both]`
+5. Label each issue source: `[api]`, `[native]`, or `[both]`
 6. Log both outputs to `.vqa.log`
 
 ## Analysis Criteria

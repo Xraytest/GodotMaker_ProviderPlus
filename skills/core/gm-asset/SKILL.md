@@ -3,8 +3,8 @@ name: gm-asset
 description: |
   Asset collection + generation. Reads ASSETS.md MISSING entries (rows
   whose Tag matches the current tag), dispatches an analyst subagent for
-  user-provided image inspection, calls tools/asset_gen.py (Bash) for AI
-  generation, updates ASSETS.md status. ASSETS.md is cross-tag — every
+  user-provided image inspection, generates AI images through the configured
+  asset_image_model path, updates ASSETS.md status. ASSETS.md is cross-tag — every
   row carries a Tag column marking the introducing tag. Re-runnable any
   time during a tag. Explicit invocation only — use /gm-asset.
 disable-model-invocation: true
@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 $ARGUMENTS
 
-You are filling in the missing assets in `ASSETS.md` for the **current tag** (read the tag from `PLAN.md`'s `**Tag:**` header). `ASSETS.md` is a cross-tag accumulating manifest: every row has a `Tag` column marking the tag that introduced it. Process only rows whose `Tag` matches the current tag AND whose `Status` is `MISSING`. Previous tags' assets stay on disk and stay listed in `ASSETS.md` with their original `Tag` value — do not re-list, re-generate, or relabel them. Image analysis runs in an analyst subagent (context isolation for image binaries); AI generation is a direct Bash call to `tools/asset_gen.py` — no worker subagent needed.
+You are filling in the missing assets in `ASSETS.md` for the **current tag** (read the tag from `PLAN.md`'s `**Tag:**` header). `ASSETS.md` is a cross-tag accumulating manifest: every row has a `Tag` column marking the tag that introduced it. Process only rows whose `Tag` matches the current tag AND whose `Status` is `MISSING`. Previous tags' assets stay on disk and stay listed in `ASSETS.md` with their original `Tag` value — do not re-list, re-generate, or relabel them. Image analysis runs in an analyst subagent (context isolation for image binaries); AI generation follows `.godotmaker/config.yaml`'s `asset_image_model`.
 
 This skill is **per-tag re-runnable**: a user can call `/gm-asset` between build batches when they add new art files. Each invocation processes whatever is currently `MISSING` for the current tag.
 
@@ -42,13 +42,24 @@ Asset is re-runnable per tag, so the gate is the current state of `ASSETS.md` pl
 ## Hard Rules
 
 1. **Direct Write/Edit by you (main agent) is restricted to project-root `ASSETS.md` and files under `.godotmaker/`.** Files in `assets/` and `references/` reach disk only via:
-   - `tools/asset_gen.py` invoked through Bash (a subprocess — hook does not police its writes), OR
+   - `tools/asset_gen.py` invoked through Bash for API-backed generation, OR
+   - the selected runtime-native image-generation provider/tool, OR
    - the analyst subagent (Step 2).
-   You never write image files yourself. The hook boundary is your Write/Edit tool calls; Bash subprocesses fall outside it by design — this is the intended path for AI generation, not a loophole to abuse.
+   Do NOT write image files with direct Write/Edit calls.
 2. **Image analysis MUST go through the analyst subagent.** Do NOT Read image binaries from `assets/` yourself — they pollute context. Dispatch analyst when you need style/dimension/role extraction.
 3. **You CANNOT modify PLAN.md, GAP.md, STRUCTURE.md, SCENES.md.** Asset work is isolated from gameplay planning. Code-art coupling issues surface in `/gm-evaluate` and are addressed in `/gm-fixgap` or the next tag.
 4. **You CANNOT write game code.** Code lives in `/gm-build` workers.
 5. **Audio MUST be user-provided** — AI audio generation is not supported. Mark audio as deferred and remind the user.
+
+## Model Selection
+
+Read `.godotmaker/config.yaml` before generation. Use `asset_image_model` for image assets and scene references:
+
+- `native`: use the active agent runtime's native image-generation provider/tool.
+- `codex`: use Codex runtime-native image-generation provider/tool.
+- `gemini:<model>`, `openai:<model>`, `grok:<model>`: call `tools/asset_gen.py image --model <selector> ...`.
+
+If the selected provider is unavailable, STOP and ask the user to choose another `asset_image_model`.
 
 ## Process
 
@@ -80,11 +91,12 @@ For each scene in SCENES.md whose `references/scene_{name}.png` is missing:
 
 1. **Read `references/visual-target.md` first** — it has the prompt rules (enumerate every object, exclude effects you won't build, show HUD, etc.) and a prompt template. These reference images become the VQA contract that `gm-evaluate` enforces, so the rules matter.
 2. Build the prompt for this scene using inputs from `SCENES.md` (Elements + Mood) + `ASSETS.md` Art Direction + `GDD.md` §4. If the user provided art in `assets/`, also reference the analyst's style summary from `assets/manifest.json`.
-3. Run via Bash:
+3. Generate the image using the selected `asset_image_model` path. For API-backed selectors, run via Bash:
    ```bash
-   python tools/asset_gen.py image --model gemini --prompt "..." \
+   python tools/asset_gen.py image --model <asset_image_model> --prompt "..." \
      --size 1K --aspect-ratio 16:9 -o references/scene_{name}.png
    ```
+   For `native` or `codex`, use the selected runtime-native provider/tool and place the PNG at `references/scene_{name}.png`.
 4. Show the result to the user. If rejected, regenerate with a tightened prompt (per `references/visual-target.md`).
 
 ### Step 4 — Generate Remaining MISSING Art
@@ -94,7 +106,7 @@ For all remaining MISSING art assets in ASSETS.md (excluding audio):
 Confirm with user:
 > "I'll AI-generate the following: {list}. {if user art: 'Style will match your existing assets.'} OK to proceed?"
 
-After confirmation, run `python tools/asset_gen.py` once per asset (per `asset-planner.md` + `asset-gen.md` for prompt construction). Sequential is fine — generation latency is API-bound, not CPU-bound. If you want concurrency, use `&` to background several Bash calls and `wait` for them.
+After confirmation, generate each asset through the selected `asset_image_model` path (per `asset-planner.md` + `asset-gen.md` for prompt construction). For API-backed selectors, run `python tools/asset_gen.py image --model <asset_image_model>` once per asset. For `native` or `codex`, use the selected runtime-native provider/tool. Sequential is fine; generation latency is provider-bound, not CPU-bound. If you use Bash concurrency for API calls, background several calls with `&` and `wait` for them.
 
 ### Step 5 — Update ASSETS.md
 
@@ -127,7 +139,7 @@ Never revert a `provided`/`generated` row back to `MISSING` — if the user want
 **CLI tools (call via Bash):**
 | Tool | Purpose |
 |------|---------|
-| `tools/asset_gen.py` | AI image generation (Gemini) |
+| `tools/asset_gen.py` | API-backed image generation (Gemini / OpenAI / Grok) |
 
 **Reference docs (read for prompt construction):**
 - `references/asset-planner.md` — generation brief template

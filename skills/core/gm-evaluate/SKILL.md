@@ -112,10 +112,10 @@ All of these must pass for `result == "approve"`. Failure of any is a `critical_
 
    **Audit trail.** Record every visual-qa call (verdict + context + mode + output digest) in `visual_checks.{scene_name}.vqa_calls[]` (schema below). If you override a recorded verdict for the final `result` — for instance you read the PNGs yourself and disagree — write the reason and what you saw into `visual_checks.{scene_name}.notes`. Either way, `result` reflects the chain transparently.
 
-   If a `fail` looks wrong, prefer re-calling visual-qa with refined `--context` or `--both` (Gemini + native aggregated) before overriding by hand. If the final visual-qa output marks an issue as style-only or non-blocking, do not promote it to `critical_issue`; record it in `visual_checks.{scene_name}.notes` or `minor_issues`.
+   If a `fail` looks wrong, prefer re-calling visual-qa with refined `--context` or `--both` before overriding by hand. If the final visual-qa output marks an issue as style-only or non-blocking, do not promote it to `critical_issue`; record it in `visual_checks.{scene_name}.notes` or `minor_issues`.
 
    - Verdict mapping (on the final recorded verdict): `fail` → critical_issue; `warning` → major_issue; `pass` → recorded under `visual_checks`.
-   - Backend defaults to Gemini Flash; pass `--native` for Claude vision or `--both` for aggregated verdict if a check is ambiguous.
+   - Backend follows `vqa_model` / `vqa_fallback_model` in `.godotmaker/config.yaml`; pass `--native` for runtime-native inspection or `--both` for an aggregated native + API verdict if a check is ambiguous.
 
 For each check, record: **PASS** or **FAIL** with evidence (E2E output, screenshot path, error message).
 
