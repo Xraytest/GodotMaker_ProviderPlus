@@ -100,12 +100,14 @@ All of these must pass for `result == "approve"`. Failure of any is a `critical_
 
    **Context construction.** Pull the `Acceptance criteria` block from SCENES.md for this scene; paste it verbatim into the `Verify:` field. If the block is absent, fall back to the mechanic ids from PLAN.md Tag Mechanics + Inherited Mechanics that this scene exercises, each with its one-line description. Never leave `Requirements:` or `Verify:` as a placeholder. For deterministic setup screenshots, add `Visible state only; do not infer prior play history.` to `Verify:`.
 
+   **VQA log path.** Ask `visual-qa` to write its debug log to `e2e/screenshots/vqa.log`.
+
    ```
    # Static scene
-   Skill(skill="visual-qa") "Check references/scene_{name}.png against e2e/screenshots/scene_{name}.png — Goal: {scene goal from SCENES.md}, Requirements: {key elements + layout}, Verify: {acceptance criteria block, or mechanic-id list fallback}."
+   Skill(skill="visual-qa") "Check references/scene_{name}.png against e2e/screenshots/scene_{name}.png --log e2e/screenshots/vqa.log — Goal: {scene goal from SCENES.md}, Requirements: {key elements + layout}, Verify: {acceptance criteria block, or mechanic-id list fallback}."
 
    # Dynamic scene (frame sequence in per-scene subdir)
-   Skill(skill="visual-qa") "Check references/scene_{name}.png against e2e/screenshots/scene_{name}/frame_*.png — Goal: ..., Requirements: ..., Verify: motion is fluid, no stuck entities, animation matches movement."
+   Skill(skill="visual-qa") "Check references/scene_{name}.png against e2e/screenshots/scene_{name}/frame_*.png --log e2e/screenshots/vqa.log — Goal: ..., Requirements: ..., Verify: motion is fluid, no stuck entities, animation matches movement."
    ```
 
    **Audit trail.** Record every visual-qa call (verdict + context + mode + output digest) in `visual_checks.{scene_name}.vqa_calls[]` (schema below). If you override a recorded verdict for the final `result` — for instance you read the PNGs yourself and disagree — write the reason and what you saw into `visual_checks.{scene_name}.notes`. Either way, `result` reflects the chain transparently.

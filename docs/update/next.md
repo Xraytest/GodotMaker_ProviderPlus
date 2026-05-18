@@ -66,5 +66,6 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - `/gm-evaluate` records every visual-qa call in `visual_checks.<scene>.vqa_calls[]`; any agent-side override of the recorded verdict lands in `.notes` so the chain from initial call to final `result` stays auditable.
 - `visual-qa`, `/gm-evaluate`, and `/gm-fixgap` no longer turn style-only reference mismatches into blocking visual tasks when the acceptance criteria already pass.
 - `visual_qa.py` now reads prompt templates as UTF-8 on Windows.
+- `/gm-evaluate` now writes VQA debug logs under `e2e/screenshots/` while `visual-qa` keeps its standalone default log path.
 
 ## Removed

@@ -65,3 +65,11 @@ def test_visual_qa_contract_avoids_prior_history_inference():
 
     assert "Do not infer prior play history" in vqa
     assert "Visible state only; do not infer prior play history." in evaluate
+
+
+def test_evaluate_uses_e2e_vqa_log_without_changing_visual_qa_default():
+    vqa = VQA_SKILL.read_text(encoding="utf-8")
+    evaluate = EVALUATE_SKILL.read_text(encoding="utf-8")
+
+    assert "${VQA_LOG:-.vqa.log}" in vqa
+    assert "e2e/screenshots/vqa.log" in evaluate

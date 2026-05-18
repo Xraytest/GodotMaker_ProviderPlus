@@ -28,6 +28,9 @@ ambiguous, or logically false.
 
 ## Mode Detection
 
+If arguments include `--log <path>`, set `VQA_LOG` to that path and remove
+those tokens before mode detection.
+
 Pick the mode from caller args by matching the first row whose precondition holds. If no row matches, STOP and tell the caller their args are malformed — do not fall back to a different mode.
 
 | Mode | Precondition (in args) | Required argv shape |
@@ -48,7 +51,7 @@ After producing output, append a debug log entry:
 
 ```bash
 printf '{"ts":"%s","mode":"MODE","model":"native","query":"QUERY","files":["FILE1","FILE2"],"output":"FIRST_LINE..."}\n' \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> .vqa.log
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${VQA_LOG:-.vqa.log}"
 ```
 
 ## Gemini Execution (`--gemini`)
@@ -66,16 +69,16 @@ MODEL_FLAG=""
 [ -n "$VQA_MODEL" ] && MODEL_FLAG="--model $VQA_MODEL"
 
 # Static
-PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log .vqa.log $MODEL_FLAG [--context "Goal: ... Requirements: ... Verify: ..."] reference.png screenshot.png
+PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log ${VQA_LOG:-.vqa.log} $MODEL_FLAG [--context "Goal: ... Requirements: ... Verify: ..."] reference.png screenshot.png
 
 # Dynamic
-PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log .vqa.log $MODEL_FLAG [--context "..."] reference.png frame1.png frame2.png ...
+PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log ${VQA_LOG:-.vqa.log} $MODEL_FLAG [--context "..."] reference.png frame1.png frame2.png ...
 
 # Question
-PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log .vqa.log $MODEL_FLAG --question "the question" screenshot.png [frame2.png ...]
+PYTHON ${CLAUDE_SKILL_DIR}/scripts/visual_qa.py --log ${VQA_LOG:-.vqa.log} $MODEL_FLAG --question "the question" screenshot.png [frame2.png ...]
 ```
 
-(`PYTHON` = whichever command worked above.) Always pass `--log .vqa.log`. Print the script output as your response.
+(`PYTHON` = whichever command worked above.) Always pass `--log`. Use `.vqa.log` unless the caller provides a log path. Print the script output as your response.
 
 ## Aggregated Mode (`--both`)
 
