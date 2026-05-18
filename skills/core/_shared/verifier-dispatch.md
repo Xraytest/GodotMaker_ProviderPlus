@@ -23,9 +23,12 @@ Agent({
 ### Project Path                                         [REQUIRED]
 {Absolute path to the Godot project}
 
+### Godot Path                                           [REQUIRED]
+{Absolute path read from .claude/godotmaker.yaml}
+
 ### Commands to Run (run ALL, do not skip)               [REQUIRED]
-1. Build: godot --headless --quit 2>&1
-2. Unit tests: godot --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --add res://{test_file} --ignoreHeadlessMode
+1. Build: "<godot_path>" --headless --quit 2>&1
+2. Unit tests: "<godot_path>" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --add res://{test_file} --ignoreHeadlessMode
 3. {additional commands}
 
 ### Success Criteria                                     [REQUIRED]

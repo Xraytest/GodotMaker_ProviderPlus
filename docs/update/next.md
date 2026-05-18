@@ -45,6 +45,7 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - Generated projects now include `.gitattributes` rules that normalize text line endings and keep Windows scripts on CRLF.
 - Generated projects now register the `godot-e2e` `AutomationServer` autoload, and `check_project.py --build` verifies it.
 - Codex runtime mapping now explicitly maps shared `.claude/godotmaker.yaml` config reads to `.agents/godotmaker.yaml`.
+- Verifier dispatch now passes the configured Godot executable path into Godot commands.
 
 ## Fixed
 

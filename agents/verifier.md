@@ -46,6 +46,9 @@ You MAY write ephemeral test scripts to a temp directory (/tmp or $TMPDIR) when 
 ### Project Path                                         [REQUIRED]
 {Absolute path to the Godot project}
 
+### Godot Path                                           [REQUIRED FOR GODOT COMMANDS]
+{Absolute path to the Godot executable}
+
 ### Commands to Run (run ALL, do not skip)               [REQUIRED]
 1. {exact command with expected behavior}
 2. {another command}
@@ -117,13 +120,13 @@ For SKIP:
 
 ### Build
 ```bash
-godot --headless --quit 2>&1
+"<godot_path>" --headless --quit 2>&1
 ```
 Broken build = automatic FAIL for entire verification.
 
 ### Unit Tests
 ```bash
-godot --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --add res://test/ --ignoreHeadlessMode
+"<godot_path>" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --add res://test/ --ignoreHeadlessMode
 ```
 Report: total passed / failed / skipped. Each failure: test name, expected vs actual. Use the command shape above.
 
