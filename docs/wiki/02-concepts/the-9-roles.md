@@ -163,6 +163,7 @@ The pipeline runs **per tag** (SemVer: v0.1.0, v0.2.0, …). One full pass throu
 
 **What happens behind the scenes:**
 - Verifies the project still builds clean and `evaluation.json` says `approve`
+- Reconciles `PLAN.md`, `STRUCTURE.md`, and scene docs against the final code so archived names match the systems and components that actually shipped
 - Copies the current `GDD.md`/`PLAN.md`/`STRUCTURE.md`/`SCENES.md`/`MEMORY.md` (full snapshots) and `evaluation.json` into `docs/tags/<Tag>/`
 - Generates `docs/tags/<Tag>/CHANGELOG.md` summarising delivered mechanics, added systems, and any cross-tag refactors
 - Runs `git tag <Tag>` locally (does not push)

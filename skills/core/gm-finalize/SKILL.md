@@ -63,11 +63,13 @@ If any check fails, STOP and tell the user which one — finalize must not seal 
 For each per-tag document, verify it matches what was actually built **in this tag**. Do NOT update prior tags' archives.
 
 - **GDD.md**: Cross-tag "north star". If the user changed design intent during this tag's gm-gdd round, GDD should already reflect it. Check that no claims about future tags have leaked in.
-- **PLAN.md**: All tasks `verified`. Tag Mechanics + Inherited Mechanics sections present and complete.
-- **STRUCTURE.md**: Components and Systems listed match what actually exists in code. Run a quick scan: list `extends Component` / `extends System` files and reconcile.
+- **PLAN.md**: All tasks `verified`. Tag Mechanics + Inherited Mechanics sections present and complete. Task file references and system/component names match the final code, not the original worker plan.
+- **STRUCTURE.md**: Components and Systems listed match what actually exists in code. Run a quick scan: list `extends Component` / `extends System` files and reconcile names, responsibilities, and schedules against the final files under `src/`.
 - **ASSETS.md**: Verify rows match `assets/` directory contents.
 - **SCENES.md**: Scene descriptions match actual scenes added in this tag.
 - **MEMORY.md**: Cross-tag accumulator. Append-only since the previous tag — don't rewrite history; if a previous discovery was later proven wrong, mark it `(superseded by …)` instead of deleting.
+
+Before archiving, search the root docs for stale implementation names that no longer exist in `src/` (for example renamed Systems or Components). If a name appears only in docs and not in code, either update it to the actual name or remove the stale claim. This is a documentation fix only; do not rename code in finalize.
 
 For any inconsistency: update the doc to match reality. Do NOT change code here — finalize is a paper-trail step.
 

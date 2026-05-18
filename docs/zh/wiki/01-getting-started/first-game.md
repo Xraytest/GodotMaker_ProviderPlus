@@ -185,7 +185,7 @@ claude
 /gm-finalize
 ```
 
-**会发生什么：** AI 做收尾工作——把当前 tag 的工作文档归档到 `docs/tags/<Tag>/`、写一份按 tag 的 changelog、在本地执行 `git tag <Tag>`，并重置每 tag 的运行时状态以便下一个 `/gm-gdd` 在干净状态下开始。这一步很短，自动完成。
+**会发生什么：** AI 做收尾工作——先对照最终代码核对工作文档，再把当前 tag 的工作文档归档到 `docs/tags/<Tag>/`、写一份按 tag 的 changelog、在本地执行 `git tag <Tag>`，并重置每 tag 的运行时状态以便下一个 `/gm-gdd` 在干净状态下开始。这一步很短，自动完成。
 
 **生成的文件：** `docs/tags/<Tag>/` 归档、`.godotmaker/final_report.json`、本地 git tag。
 

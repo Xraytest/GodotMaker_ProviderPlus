@@ -185,7 +185,7 @@ You will see a lot of output as tasks are dispatched and reported back. This is 
 /gm-finalize
 ```
 
-**What to expect:** The AI tidies everything up — archives the tag's working docs into `docs/tags/<Tag>/`, writes a per-tag changelog, runs `git tag <Tag>` locally, and resets per-tag runtime state so the next `/gm-gdd` starts clean. This is a short, automatic step.
+**What to expect:** The AI tidies everything up — checks the working docs against the final code, archives them into `docs/tags/<Tag>/`, writes a per-tag changelog, runs `git tag <Tag>` locally, and resets per-tag runtime state so the next `/gm-gdd` starts clean. This is a short, automatic step.
 
 **What lands on disk:** `docs/tags/<Tag>/` archive, `.godotmaker/final_report.json`, a local git tag.
 

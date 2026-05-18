@@ -163,6 +163,7 @@
 
 **背后发生了什么：**
 - 验证项目仍能干净编译，`evaluation.json` 显示 `approve`
+- 对照最终代码核对 `PLAN.md`、`STRUCTURE.md` 和场景文档，确保归档里的名称对应实际交付的系统和组件
 - 把当前的 `GDD.md` / `PLAN.md` / `STRUCTURE.md` / `SCENES.md` / `MEMORY.md`（完整快照）和 `evaluation.json` 复制到 `docs/tags/<Tag>/`
 - 生成 `docs/tags/<Tag>/CHANGELOG.md`，总结交付的 mechanic、新增系统、跨 tag refactor
 - 在本地执行 `git tag <Tag>`（不 push）
