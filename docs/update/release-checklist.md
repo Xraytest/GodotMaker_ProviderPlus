@@ -49,7 +49,24 @@ Steps to follow when publishing a new version of GodotMaker.
    - **`VERSION`** — single-line file at the repo root, content is the bare `X.Y.Z` (no leading `v`, no trailing newline issues). This is the **source-of-truth** `tools/publish.py` reads (`read_source_version()` at `tools/publish.py:43`) and writes into target projects' `.godotmaker/version`. Forgetting this bump causes downstream consumers (`godotmaker-cli`, `publish.py` upgrade detection) to see `installed_version != target_version` on every run, triggering an infinite "framework upgrade X.Y.Z-1 → X.Y.Z" loop that never converges.
    - `pyproject.toml` — update `version = "X.Y.Z"`. Python package metadata only; not consumed by the publish pipeline, but kept in sync so PyPI/SDK consumers see the same number.
    - `CHANGELOG.md` — add a new `## [X.Y.Z] — YYYY-MM-DD` section with entries from the archived `next.md`
-   - **`LICENSE` Change Date** — in the `Change Date` field, pin this release's concrete Change Date: the calendar date equal to this release's publication date plus four years (a release published 2026-06-01 records `2030-06-01`). The field states the relative rule; the tagged release must also record the absolute date so the "version" and its "first publicly available distribution" cannot be disputed later. BUSL converts each version on its own date — never reuse a previous release's date.
+   - **`LICENSE` Change Date** — in the `Change Date` field, pin this release's concrete Change Date: the calendar date equal to this release's publication date plus four years (a release published 2026-06-01 records `2030-06-01`). BUSL treats `Change Date` as a license parameter, so the tagged release's `LICENSE` should contain only the concrete value, followed directly by `Change License`.
+     ```text
+     Change Date:
+     2030-06-01.
+
+     Change License:
+     Apache License, Version 2.0.
+     ```
+     Do not leave the rolling-main explanatory text under `Change Date` in a tagged release:
+     ```text
+     For each specific version of the Licensed Work, the fourth anniversary of the
+     first publicly available distribution of that version under this License. For
+     this purpose, a "version" of the Licensed Work means a release published under a
+     Semantic Versioning tag (for example, v0.4.0). The LICENSE file included in each
+     such tagged release records that version's Change Date as a specific calendar
+     date.
+     ```
+     Keep that rule in this checklist/docs instead. BUSL converts each version on its own date — never reuse a previous release's date.
 
 4. **Run all tests locally**
    ```bash
