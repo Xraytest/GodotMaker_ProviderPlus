@@ -19,7 +19,7 @@ if [ -f "$PRECOMMIT_DST" ] && [ ! -L "$PRECOMMIT_DST" ]; then
 fi
 
 ln -sf ../../scripts/pre-commit "$PRECOMMIT_DST"
-echo "  Installed pre-commit hook as symlink (ruff lint + gitleaks secret scan)"
+echo "  Installed pre-commit hook as symlink (ruff lint + docs i18n + gitleaks secret scan)"
 
 # Verify ruff
 if command -v ruff &> /dev/null; then

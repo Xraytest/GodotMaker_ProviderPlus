@@ -10,6 +10,30 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
+  doc-i18n:
+    name: Doc i18n
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Check changed user docs have Chinese mirrors
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="$(git rev-list --max-parents=0 HEAD)"
+            fi
+          fi
+          python tools/check_doc_i18n.py --base "$BASE" --head "$GITHUB_SHA"
+
   lint-python:
     name: Lint Python
     runs-on: ubuntu-latest
