@@ -24,6 +24,8 @@ If no category fits, add a new one following [Keep a Changelog](https://keepacha
 - Tags are now planned and evaluated as minimal playable units, with runtime proof required for the playable path before evaluation can approve.
 - Evaluate completion now validates that every Playable Unit row has a recorded E2E test and non-empty runtime evidence.
 - Build workers now receive one game-mechanic function per task instead of system-first work units.
+- Visual prompt style guide now gives asset generation a shared visual language.
+- Finalize now archives the current tag's E2E tests and screenshots under `docs/tags/<Tag>/evidence/` for later review and debugging.
 
 ## Fixed
 
