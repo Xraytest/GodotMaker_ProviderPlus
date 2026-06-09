@@ -380,10 +380,19 @@ def check_api_keys(
         r.warn("GOOGLE_API_KEY not set (not required by current config)")
 
     if "openai" in required:
-        if os.environ.get("OPENAI_API_KEY"):
-            r.ok("OPENAI_API_KEY set")
+        # Check for custom API key env var from config
+        api_key_env = config.get("openai_api_key_env", "OPENAI_API_KEY")
+        api_key = os.environ.get(api_key_env)
+        if api_key:
+            masked = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+            r.ok(f"{api_key_env} set ({masked})")
         else:
-            r.fail("OPENAI_API_KEY not set but config uses an OpenAI model")
+            r.fail(f"{api_key_env} not set but config uses an OpenAI model")
+            
+        # Check base_url configuration
+        base_url = config.get("openai_base_url")
+        if base_url:
+            r.ok(f"OpenAI-compatible base_url configured: {base_url}")
     elif os.environ.get("OPENAI_API_KEY"):
         r.ok("OPENAI_API_KEY set (optional)")
     else:

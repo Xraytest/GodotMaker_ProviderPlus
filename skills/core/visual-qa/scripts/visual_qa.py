@@ -15,10 +15,14 @@ Question mode: free-form question + any number of screenshots. No reference need
 --model: Required model selector, e.g. gemini:<model> or openai:<model>.
 --log: Path to JSONL log file for debug logging.
 Requires: GEMINI_API_KEY / GOOGLE_API_KEY for Gemini, or OPENAI_API_KEY for OpenAI.
+Supports OpenAI-compatible providers via config in .godotmaker/config.yaml:
+  openai_base_url: https://your-provider.com/v1
+  openai_api_key_env: YOUR_API_KEY_ENV
 """
 
 import base64
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +32,48 @@ STATIC_PROMPT = PROMPTS_DIR / "static_prompt.md"
 DYNAMIC_PROMPT = PROMPTS_DIR / "dynamic_prompt.md"
 QUESTION_PROMPT = PROMPTS_DIR / "question_prompt.md"
 CRITERIA_PROMPT = PROMPTS_DIR / "criteria.md"
+CONFIG_FILE = Path(__file__).resolve().parents[4] / ".godotmaker" / "config.yaml"
+
+
+def _load_project_config() -> dict[str, str]:
+    """Read simple top-level scalar values from .godotmaker/config.yaml."""
+    if not CONFIG_FILE.exists():
+        return {}
+    config = {}
+    try:
+        for raw_line in CONFIG_FILE.read_text(encoding="utf-8").splitlines():
+            if raw_line.startswith((" ", "\t")):
+                continue
+            line = raw_line.split("#", 1)[0].strip()
+            if not line or ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            key = key.strip()
+            value = value.strip().strip("\"'")
+            if key and value:
+                config[key] = value
+    except OSError:
+        return {}
+    return config
+
+
+def _get_openai_client_config(config: dict[str, str]) -> dict:
+    """Build OpenAI client configuration from project config."""
+    client_config = {}
+    
+    # Get base URL if configured
+    base_url = config.get("openai_base_url")
+    if base_url:
+        client_config["base_url"] = base_url
+    
+    # Get API key from environment variable if configured
+    api_key_env = config.get("openai_api_key_env")
+    if api_key_env:
+        api_key = os.environ.get(api_key_env)
+        if api_key:
+            client_config["api_key"] = api_key
+    
+    return client_config
 
 def _mime_for_image(path: Path) -> str:
     return {
@@ -188,7 +234,9 @@ def main():
         elif provider == "openai":
             from openai import OpenAI
 
-            client = OpenAI()
+            config = _load_project_config()
+            client_config = _get_openai_client_config(config)
+            client = OpenAI(**client_config) if client_config else OpenAI()
             content = [{"type": "input_text", "text": prompt}]
             if question:
                 for i, p in enumerate(paths, 1):

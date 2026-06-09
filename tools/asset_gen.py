@@ -330,11 +330,34 @@ def _save_openai_b64(response, output: Path):
     img.save(output, format="PNG")
 
 
+def _get_openai_client_config(config: dict[str, str]) -> dict:
+    """Build OpenAI client configuration from project config."""
+    client_config = {}
+    
+    # Get base URL if configured
+    base_url = config.get("openai_base_url")
+    if base_url:
+        client_config["base_url"] = base_url
+    
+    # Get API key from environment variable if configured
+    api_key_env = config.get("openai_api_key_env")
+    if api_key_env:
+        import os
+        api_key = os.environ.get(api_key_env)
+        if api_key:
+            client_config["api_key"] = api_key
+    
+    return client_config
+
+
 def _generate_openai(args, output: Path, cost: int, model_name: str):
     from openai import OpenAI
 
+    config = _load_project_config()
+    client_config = _get_openai_client_config(config)
+    
     api_size, _ = _openai_size(args.size, args.aspect_ratio)
-    client = OpenAI()
+    client = OpenAI(**client_config) if client_config else OpenAI()
     try:
         if args.image:
             ref_path = Path(args.image)

@@ -1,0 +1,64 @@
+# GodotMaker Configuration
+# Configure your AI providers and models here
+
+# === Agent Runtime ===
+# agent: claude-code  # or "codex"
+agent: claude-code
+
+# === Visual QA Model ===
+# Format: provider:model_name
+# Supported providers: gemini, openai, grok, native, codex
+# Examples:
+#   vqa_model: gemini:gemini-2.5-flash
+#   vqa_model: openai:gpt-4o
+#   vqa_model: native  # uses the active agent runtime
+vqa_model: gemini:gemini-2.5-flash
+
+# === Asset Image Generation ===
+# Format: provider:model_name
+# Supported providers: gemini, openai, grok, native, codex
+# Examples:
+#   asset_image_model: gemini:gemini-3.1-flash-image-preview
+#   asset_image_model: openai:gpt-image-2
+#   asset_image_model: grok:grok-imagine-image
+#   asset_image_model: native  # uses the active agent runtime
+asset_image_model: gemini:gemini-3.1-flash-image-preview
+
+# Legacy provider-specific config (optional, overridden by asset_image_model if set)
+# asset_image_provider: gemini
+# gemini_image_model: gemini-3.1-flash-image-preview
+# grok_image_model: grok-imagine-image
+
+# === Asset Video Generation ===
+# Format: provider:model_name
+# Currently only Grok supports video generation
+# Examples:
+#   asset_video_model: grok:grok-imagine-video
+#   asset_video_model: none  # disable video generation
+asset_video_model: grok:grok-imagine-video
+
+# Legacy config (optional, overridden by asset_video_model if set)
+# grok_video_model: grok-imagine-video
+
+# === OpenAI-Compatible Provider Configuration ===
+# For any OpenAI-compatible API provider (e.g., local LLMs, alternative providers)
+# Set base_url to your provider's API endpoint
+# Set api_key_env to the environment variable name containing your API key
+# Example for local Ollama:
+#   openai_base_url: http://localhost:11434/v1
+#   openai_api_key_env: OLLAMA_API_KEY
+# Example for Azure OpenAI:
+#   openai_base_url: https://your-resource.openai.azure.com/openai/deployments/your-deployment
+#   openai_api_key_env: AZURE_OPENAI_API_KEY
+# Example for generic provider:
+#   openai_base_url: https://api.your-provider.com/v1
+#   openai_api_key_env: YOUR_PROVIDER_API_KEY
+# Leave empty or comment out to use official OpenAI API
+# openai_base_url:
+# openai_api_key_env: OPENAI_API_KEY
+
+# === Gemini Configuration ===
+# gemini_api_key_env: GOOGLE_API_KEY  # or GEMINI_API_KEY
+
+# === Grok (xAI) Configuration ===
+# grok_api_key_env: XAI_API_KEY

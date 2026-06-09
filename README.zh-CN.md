@@ -72,6 +72,21 @@ pip install -r tools/requirements.txt
 python tools/check_env.py
 ```
 
+### 同时使用分支版本和 npm 全局安装版本
+
+如果你想在不卸载 npm 全局版本的情况下测试当前分支版本：
+
+```bash
+# 运行迁移助手脚本
+bash scripts/migrate_to_branch.sh
+
+# 在加载 shell 配置后，可以使用：
+godotmaker      # 原始 npm 全局版本
+gm-branch       # 当前分支版本
+```
+
+详见 [迁移指南](docs/migration-guide.md)。
+
 ## 你需要准备
 
 | 工具 | 用途 |
