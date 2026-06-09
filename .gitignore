@@ -1,40 +1,94 @@
-# Internal materials (design decisions, research notes, test metrics)
-.local-docs/
+```
+# Configuration and environment
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+target/
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.py.class
+.Python
+env/
+venv/
+.venv/
+.eggs/
+.egg-info/
 *.egg-info/
-dist/
-build/
+.installed.cfg
+*.manifest
+*.spec
 
-# Node.js
-node_modules/
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 
-# Godot
-.godot/
-*.import
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+*.coverage
 
-# IDE / Editor
+# IDE specific
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+*.tmp
 
-# OS
-Thumbs.db
+# OS generated files
 .DS_Store
+Thumbs.db
 
-# Environment / Secrets
-.env
-.env.*
-*.pem
-*.key
+# Gradle
+.gradle/
 
-# Staging directory (not part of the project)
-_open-source-setup/
+# MyPy
+.mypy_cache/
 
-# MkDocs build output
-site/
-docs/review/
+# Pytest
+.pytest_cache/
+
+# Go
+*.o
+*.a
+*.so
+*.exe
+*.dll
+*.dylib
+*.test
+*.prof
+```

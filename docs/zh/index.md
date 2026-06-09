@@ -17,8 +17,9 @@ GodotMaker 通过 `godotmaker-cli` 把你的游戏想法变成可运行的 Godot
 ## 从这里开始
 
 1. [安装](wiki/01-getting-started/installation.md) — 必需工具、可选 API key 和环境检查
-2. [做你的第一个游戏](wiki/01-getting-started/first-game.md) — CLI 驱动的 idea 到可运行游戏流程
-3. [它是怎么工作的](wiki/02-concepts/how-it-works.md) — CLI 背后的角色、质量门禁和修复循环
+2. [迁移指南](../migration-guide.md) — 同时使用分支版本和 npm 全局安装版本
+3. [做你的第一个游戏](wiki/01-getting-started/first-game.md) — CLI 驱动的 idea 到可运行游戏流程
+4. [它是怎么工作的](wiki/02-concepts/how-it-works.md) — CLI 背后的角色、质量门禁和修复循环
 
 ## 其他快速入口
 

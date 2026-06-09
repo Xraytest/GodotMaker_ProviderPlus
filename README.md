@@ -72,6 +72,21 @@ pip install -r tools/requirements.txt
 python tools/check_env.py
 ```
 
+### Using Branch Version Alongside npm Global Installation
+
+If you want to test the current branch version while keeping your npm global installation:
+
+```bash
+# Run the migration helper script
+bash scripts/migrate_to_branch.sh
+
+# After sourcing your shell config, use:
+godotmaker      # Original npm global version
+gm-branch       # Current branch version
+```
+
+See [Migration Guide](docs/migration-guide.md) for detailed instructions.
+
 ## Requirements
 
 | Tool | Why |

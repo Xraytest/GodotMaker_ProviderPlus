@@ -17,8 +17,9 @@ GodotMaker turns a game idea into a playable Godot 4 project through a no-human-
 ## Start Here
 
 1. [Installation](wiki/01-getting-started/installation.md) - required tools, optional API keys, and environment checks.
-2. [Your first game](wiki/01-getting-started/first-game.md) - the CLI-driven idea-to-playable workflow.
-3. [How it works](wiki/02-concepts/how-it-works.md) - the roles, quality gates, and fix loops behind the CLI.
+2. [Migration Guide](migration-guide.md) - use the branch version alongside npm global installation.
+3. [Your first game](wiki/01-getting-started/first-game.md) - the CLI-driven idea-to-playable workflow.
+4. [How it works](wiki/02-concepts/how-it-works.md) - the roles, quality gates, and fix loops behind the CLI.
 
 ## Other Links
 
